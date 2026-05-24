@@ -1,0 +1,146 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets"
+                template="/WEB-INF/templates/base.xhtml">
+
+    <ui:define name="pageTitle">Setup Interview — InterviewAI</ui:define>
+
+    <ui:define name="content">
+        <div class="page-header">
+            <h2 class="page-title">Setup Interview</h2>
+            <p class="page-subtitle">Configure your practice session</p>
+        </div>
+
+        <div class="step-indicator">
+            <div class="step #{setupBean.currentStep &gt;= 1 ? 'active' : ''}">1. Type</div>
+            <div class="step-line"/>
+            <div class="step #{setupBean.currentStep &gt;= 2 ? 'active' : ''}">2. Position</div>
+            <div class="step-line"/>
+            <div class="step #{setupBean.currentStep &gt;= 3 ? 'active' : ''}">3. Level</div>
+            <div class="step-line"/>
+            <div class="step #{setupBean.currentStep &gt;= 4 ? 'active' : ''}">4. Length</div>
+            <div class="step-line"/>
+            <div class="step #{setupBean.currentStep &gt;= 5 ? 'active' : ''}">5. Launch</div>
+        </div>
+
+        <h:panelGroup rendered="#{not empty setupBean.errorMessage}">
+            <div class="alert-error">#{setupBean.errorMessage}</div>
+        </h:panelGroup>
+
+        <h:form id="setupForm">
+
+            <div id="step1" class="step-panel #{setupBean.currentStep == 1 ? '' : 'd-none'}">
+                <h3 class="mb-4">Choose Interview Type</h3>
+                <div class="type-cards row g-3">
+                    <ui:repeat value="#{setupBean.interviewTypes}" var="type">
+                        <div class="col-md-4">
+                            <div class="type-card card-dark #{setupBean.selectedType == type ? 'selected' : ''}"
+                                 onclick="selectType('#{type.name()}', this)">
+                                <div class="type-icon">#{type.icon}</div>
+                                <div class="type-name">#{type.label}</div>
+                            </div>
+                        </div>
+                    </ui:repeat>
+                </div>
+                <h:inputHidden id="selectedType" value="#{setupBean.selectedType}">
+                    <f:converter converterId="InterviewTypeConverter"/>
+                </h:inputHidden>
+                <div class="mt-4">
+                    <button type="button" class="btn-primary-custom" onclick="nextStep(1)">Next →</button>
+                </div>
+            </div>
+
+            <div id="step2" class="step-panel d-none">
+                <h3 class="mb-4">Target Job Position</h3>
+                <h:inputText id="position" value="#{setupBean.position}"
+                             styleClass="form-control-custom"
+                             placeholder="e.g. Software Engineer, Data Scientist..."/>
+                <div class="quick-positions mt-3">
+                    <span class="position-chip" onclick="setPosition('Software Engineer')">Software Engineer</span>
+                    <span class="position-chip" onclick="setPosition('Data Scientist')">Data Scientist</span>
+                    <span class="position-chip" onclick="setPosition('Product Manager')">Product Manager</span>
+                    <span class="position-chip" onclick="setPosition('DevOps Engineer')">DevOps Engineer</span>
+                    <span class="position-chip" onclick="setPosition('UX Designer')">UX Designer</span>
+                </div>
+                <div class="step-actions mt-4">
+                    <button type="button" class="btn-secondary-custom" onclick="goToStep(1)">← Back</button>
+                    <button type="button" class="btn-primary-custom" onclick="nextStep(2)">Next →</button>
+                </div>
+            </div>
+
+            <div id="step3" class="step-panel d-none">
+                <h3 class="mb-4">Select Difficulty Level</h3>
+                <div class="difficulty-selector">
+                    <ui:repeat value="#{setupBean.difficulties}" var="diff">
+                        <div class="difficulty-option #{setupBean.difficulty == diff ? 'selected' : ''}"
+                             onclick="selectDifficulty('#{diff.name()}', this)">
+                            <div class="diff-label">#{diff.label}</div>
+                            <div class="diff-desc text-secondary">#{diff.description}</div>
+                        </div>
+                    </ui:repeat>
+                </div>
+                <h:inputHidden id="difficulty" value="#{setupBean.difficulty}">
+                    <f:converter converterId="DifficultyConverter"/>
+                </h:inputHidden>
+                <div class="step-actions mt-4">
+                    <button type="button" class="btn-secondary-custom" onclick="goToStep(2)">← Back</button>
+                    <button type="button" class="btn-primary-custom" onclick="nextStep(3)">Next →</button>
+                </div>
+            </div>
+
+            <div id="step4" class="step-panel d-none">
+                <h3 class="mb-4">Number of Questions</h3>
+                <input type="range" min="5" max="20" step="5"
+                       class="range-custom w-100"
+                       oninput="updateCount(this.value)"
+                       value="10"/>
+                <div class="count-display mt-3">
+                    <span id="countValue" class="font-mono" style="font-size:2rem">10</span>
+                    <span class="text-secondary ms-2">questions</span>
+                    <span class="text-secondary ms-3" id="durationEst">~20 minutes</span>
+                </div>
+                <h:inputHidden id="questionCount" value="#{setupBean.questionCount}"/>
+                <div class="step-actions mt-4">
+                    <button type="button" class="btn-secondary-custom" onclick="goToStep(3)">← Back</button>
+                    <button type="button" class="btn-primary-custom" onclick="nextStep(4)">Next →</button>
+                </div>
+            </div>
+
+            <div id="step5" class="step-panel d-none">
+                <h3 class="mb-4">Ready to Start?</h3>
+                <div class="confirm-card card-dark p-4 mb-4">
+                    <div class="confirm-row">
+                        <span class="text-secondary">Type</span>
+                        <span id="confirmType" class="font-display"/>
+                    </div>
+                    <div class="confirm-row">
+                        <span class="text-secondary">Position</span>
+                        <span id="confirmPosition" class="font-display"/>
+                    </div>
+                    <div class="confirm-row">
+                        <span class="text-secondary">Level</span>
+                        <span id="confirmDifficulty" class="font-display"/>
+                    </div>
+                    <div class="confirm-row">
+                        <span class="text-secondary">Questions</span>
+                        <span id="confirmCount" class="font-mono"/>
+                    </div>
+                </div>
+                <div class="step-actions">
+                    <button type="button" class="btn-secondary-custom" onclick="goToStep(4)">← Back</button>
+                    <h:commandButton value="🚀 Launch Interview"
+                                     action="#{setupBean.launch}"
+                                     styleClass="btn-primary-custom btn-launch"
+                                     disabled="#{setupBean.loading}"/>
+                </div>
+            </div>
+
+        </h:form>
+    </ui:define>
+
+    <ui:define name="scripts">
+        <h:outputScript library="js" name="setup.js"/>
+    </ui:define>
+
+</ui:composition>

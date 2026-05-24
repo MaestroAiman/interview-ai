@@ -1,0 +1,85 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets"
+                template="/WEB-INF/templates/base.xhtml">
+
+    <ui:define name="pageTitle">Admin — Users — InterviewAI</ui:define>
+
+    <ui:define name="content">
+        <f:metadata>
+            <f:viewAction action="#{adminBean.init}"/>
+        </f:metadata>
+
+        <div class="page-header">
+            <h2 class="page-title">
+                <i class="bi bi-people"/> User Management
+            </h2>
+            <span class="text-secondary">#{adminBean.allUsers.size()} registered users</span>
+        </div>
+
+        <div class="card-dark p-4">
+            <h:panelGroup rendered="#{empty adminBean.allUsers}">
+                <div class="empty-state"><p>No users found.</p></div>
+            </h:panelGroup>
+
+            <h:panelGroup rendered="#{not empty adminBean.allUsers}" layout="block">
+                <h:form id="usersForm">
+                    <h:panelGroup rendered="#{not empty adminBean.errorMessage}" layout="block">
+                        <div style="background:var(--danger,#ef4444);color:#fff;padding:.5rem 1rem;border-radius:.375rem;margin-bottom:1rem;">
+                            #{adminBean.errorMessage}
+                        </div>
+                    </h:panelGroup>
+                    <div class="table-responsive">
+                        <table class="table-dark-custom">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Target Position</th>
+                                    <th>Sessions</th>
+                                    <th>Joined</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <ui:repeat value="#{adminBean.allUsers}" var="u">
+                                    <tr>
+                                        <td class="font-display">#{u.name}</td>
+                                        <td class="font-mono text-secondary">#{u.email}</td>
+                                        <td>
+                                            <span class="badge #{u.role == 'ADMIN' ? 'badge-technical' : 'badge-hr'}">
+                                                #{u.role}
+                                            </span>
+                                        </td>
+                                        <td>#{empty u.targetPosition ? '—' : u.targetPosition}</td>
+                                        <td class="font-mono">#{adminBean.sessionCountFor(u.id)}</td>
+                                        <td class="font-mono text-secondary">#{u.createdAt}</td>
+                                        <td>
+                                            <h:commandButton
+                                                value="Promote"
+                                                action="#{adminBean.promoteUser(u.id)}"
+                                                rendered="#{u.role != 'ADMIN'}"
+                                                styleClass="btn-primary-custom btn-sm"
+                                                title="Promote to ADMIN"/>
+                                            <h:commandButton
+                                                value="Demote"
+                                                action="#{adminBean.demoteUser(u.id)}"
+                                                rendered="#{adminBean.canDemote(u)}"
+                                                styleClass="btn-sm"
+                                                style="background:var(--danger,#ef4444);color:#fff;border:none;padding:.25rem .75rem;border-radius:.375rem;cursor:pointer;"
+                                                title="Demote to USER"
+                                                onclick="return confirm('Demote this admin to USER?')"/>
+                                        </td>
+                                    </tr>
+                                </ui:repeat>
+                            </tbody>
+                        </table>
+                    </div>
+                </h:form>
+            </h:panelGroup>
+        </div>
+    </ui:define>
+
+</ui:composition>

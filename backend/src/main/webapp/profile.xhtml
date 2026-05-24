@@ -1,0 +1,54 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets"
+                template="/WEB-INF/templates/base.xhtml">
+
+    <ui:define name="pageTitle">Profile — InterviewAI</ui:define>
+
+    <ui:define name="content">
+        <f:metadata>
+            <f:viewAction action="#{profileBean.init}"/>
+        </f:metadata>
+
+        <div class="page-header">
+            <h2 class="page-title">Your Profile</h2>
+        </div>
+
+        <div class="card-dark p-4" style="max-width:600px">
+            <div class="user-avatar-large mb-4">
+                #{authBean.currentUser.name.substring(0,1).toUpperCase()}
+            </div>
+
+            <h:messages styleClass="alert-error" errorClass="alert-error" infoClass="alert-success"/>
+
+            <h:form>
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Name</label>
+                    <input type="text" class="form-control-custom"
+                           value="#{authBean.currentUser.name}" disabled="disabled"/>
+                </div>
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Email</label>
+                    <input type="text" class="form-control-custom"
+                           value="#{authBean.currentUser.email}" disabled="disabled"/>
+                </div>
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Role</label>
+                    <input type="text" class="form-control-custom"
+                           value="#{authBean.currentUser.role}" disabled="disabled"/>
+                </div>
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Target Position</label>
+                    <h:inputText value="#{profileBean.targetPosition}"
+                                 styleClass="form-control-custom"
+                                 placeholder="e.g. Senior Software Engineer"/>
+                </div>
+                <h:commandButton value="Save Changes"
+                                 action="#{profileBean.save}"
+                                 styleClass="btn-primary-custom"/>
+            </h:form>
+        </div>
+    </ui:define>
+
+</ui:composition>

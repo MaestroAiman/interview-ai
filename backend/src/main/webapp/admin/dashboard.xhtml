@@ -1,0 +1,86 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets"
+                xmlns:c="jakarta.tags.core"
+                template="/WEB-INF/templates/base.xhtml">
+
+    <ui:define name="pageTitle">Admin Dashboard — InterviewAI</ui:define>
+
+    <ui:define name="content">
+        <f:metadata>
+            <f:viewAction action="#{adminBean.init}"/>
+        </f:metadata>
+
+        <div class="page-header">
+            <h2 class="page-title">
+                <i class="bi bi-shield-check text-electric-blue"/> Admin Dashboard
+            </h2>
+        </div>
+
+        <!-- Stats row -->
+        <div class="stats-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
+            <div class="card-dark p-4 text-center">
+                <div class="stat-number" style="font-size:2rem;font-weight:700;">#{adminBean.allUsers.size()}</div>
+                <div class="text-secondary">Total Users</div>
+            </div>
+            <div class="card-dark p-4 text-center">
+                <div class="stat-number" style="font-size:2rem;font-weight:700;color:#22c55e;">#{adminBean.completedCount}</div>
+                <div class="text-secondary">Completed</div>
+            </div>
+            <div class="card-dark p-4 text-center">
+                <div class="stat-number" style="font-size:2rem;font-weight:700;color:#f59e0b;">#{adminBean.inProgressCount}</div>
+                <div class="text-secondary">In Progress</div>
+            </div>
+            <div class="card-dark p-4 text-center">
+                <div class="stat-number" style="font-size:2rem;font-weight:700;color:#60a5fa;">#{String.format("%.1f", adminBean.platformAvgScore)}</div>
+                <div class="text-secondary">Avg Score</div>
+            </div>
+        </div>
+
+        <!-- All sessions table -->
+        <div class="card-dark p-4">
+            <h4 class="mb-3">All Sessions</h4>
+            <c:choose>
+                <c:when test="#{empty adminBean.allSessions}">
+                    <div class="empty-state"><p>No sessions in the system yet.</p></div>
+                </c:when>
+                <c:otherwise>
+                    <div class="table-responsive">
+                        <table class="table-dark-custom">
+                            <thead>
+                                <tr>
+                                    <th>User ID</th>
+                                    <th>Position</th>
+                                    <th>Type</th>
+                                    <th>Difficulty</th>
+                                    <th>Score</th>
+                                    <th>Status</th>
+                                    <th>Started</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <ui:repeat value="#{adminBean.allSessions}" var="s">
+                                    <tr>
+                                        <td class="font-mono text-secondary">#{s.userId.substring(0,8)}&#8230;</td>
+                                        <td class="font-display">#{s.position}</td>
+                                        <td>
+                                            <span class="badge badge-#{s.type.name().toLowerCase()}">
+                                                #{s.type.icon} #{s.type.label}
+                                            </span>
+                                        </td>
+                                        <td>#{s.difficulty.label}</td>
+                                        <td><span class="score-badge">#{String.format("%.1f", s.overallScore)}/10</span></td>
+                                        <td>#{s.status}</td>
+                                        <td class="font-mono text-secondary">#{s.startedAt}</td>
+                                    </tr>
+                                </ui:repeat>
+                            </tbody>
+                        </table>
+                    </div>
+                </c:otherwise>
+            </c:choose>
+        </div>
+    </ui:define>
+
+</ui:composition>

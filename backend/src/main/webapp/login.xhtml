@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="jakarta.faces.html"
+      xmlns:f="jakarta.faces.core">
+<h:head>
+    <title>Login — InterviewAI</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800&amp;family=DM+Sans:wght@400;500&amp;display=swap"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+    <h:outputStylesheet library="css" name="main.css"/>
+    <h:outputStylesheet library="css" name="auth.css"/>
+</h:head>
+<h:body styleClass="auth-page">
+
+    <div class="auth-container">
+        <div class="auth-card card-dark">
+            <div class="auth-logo">🎯 InterviewAI</div>
+            <h1 class="auth-title">Welcome back</h1>
+            <p class="auth-subtitle">Sign in to continue your practice</p>
+
+            <h:panelGroup rendered="#{not empty authBean.errorMessage}">
+                <div class="alert-error">#{authBean.errorMessage}</div>
+            </h:panelGroup>
+
+            <h:panelGroup rendered="#{not empty param.registered}">
+                <div class="alert-success">Account created! Please sign in.</div>
+            </h:panelGroup>
+
+            <h:form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label-custom">Email</label>
+                    <h:inputText value="#{authBean.email}"
+                                 styleClass="form-control-custom"
+                                 placeholder="you@example.com"
+                                 required="true"/>
+                </div>
+                <div class="form-group">
+                    <label class="form-label-custom">Password</label>
+                    <h:inputSecret value="#{authBean.password}"
+                                   styleClass="form-control-custom"
+                                   placeholder="••••••••"
+                                   required="true"/>
+                </div>
+                <h:commandButton value="Sign In"
+                                 action="#{authBean.login}"
+                                 styleClass="btn-primary-custom w-100 mt-2"/>
+            </h:form>
+
+            <div class="auth-footer mt-3">
+                Don't have an account?
+                <h:link outcome="/register" value=" Create one"/>
+            </div>
+        </div>
+    </div>
+
+</h:body>
+</html>

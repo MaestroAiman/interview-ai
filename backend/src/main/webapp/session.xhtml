@@ -1,0 +1,139 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets"
+                template="/WEB-INF/templates/base.xhtml">
+
+    <ui:define name="pageTitle">Interview Session — InterviewAI</ui:define>
+
+    <ui:define name="styles">
+        <h:outputStylesheet library="css" name="session.css"/>
+    </ui:define>
+
+    <ui:define name="content">
+        <f:metadata>
+            <f:viewAction action="#{sessionBean.init}"/>
+        </f:metadata>
+
+        <div id="session-data"
+             data-session-id="#{sessionBean.sessionId}"
+             data-question-id="#{sessionBean.currentQuestion != null ? sessionBean.currentQuestion.id : ''}"
+             data-question-count="#{sessionBean.session != null ? sessionBean.session.questionCount : 0}"
+             style="display:none"/>
+
+        <div class="session-layout">
+
+            <div class="session-sidebar">
+                <div class="card-dark p-3 mb-3">
+                    <div class="session-meta">
+                        <h:panelGroup rendered="#{sessionBean.session != null}">
+                            <span class="badge badge-#{sessionBean.session.type.name().toLowerCase()}">
+                                #{sessionBean.session.type.icon} #{sessionBean.session.type.label}
+                            </span>
+                            <div class="session-position mt-2">#{sessionBean.session.position}</div>
+                        </h:panelGroup>
+                    </div>
+                </div>
+
+                <div class="card-dark p-3 mb-3 text-center">
+                    <svg class="timer-circle" viewBox="0 0 100 100" width="120" height="120">
+                        <circle cx="50" cy="50" r="45" class="timer-track"/>
+                        <circle cx="50" cy="50" r="45" class="timer-progress" id="timerProgress"/>
+                        <text x="50" y="55" class="timer-text" id="timerText">60</text>
+                    </svg>
+                    <div class="text-secondary small">seconds remaining</div>
+                </div>
+
+                <div class="card-dark p-3">
+                    <div class="text-secondary small mb-2">Progress</div>
+                    <div class="progress-bar-custom">
+                        <div class="progress-fill" id="progressFill" style="width:0%"/>
+                    </div>
+                    <div class="font-mono small mt-1">
+                        <span id="qIndex">1</span>
+                        <h:panelGroup rendered="#{sessionBean.session != null}">
+                            / #{sessionBean.session.questionCount}
+                        </h:panelGroup>
+                    </div>
+                </div>
+            </div>
+
+            <div class="session-main">
+                <div class="chat-area" id="chatArea">
+                    <h:panelGroup rendered="#{sessionBean.currentQuestion != null}">
+                        <div class="bubble-ai">
+                            <div class="bubble-avatar">AI</div>
+                            <div class="bubble-content">#{sessionBean.currentQuestion.content}</div>
+                        </div>
+                    </h:panelGroup>
+                </div>
+
+                <div class="input-area">
+                    <div class="input-row">
+                        <button type="button" id="micBtn" class="btn-mic"
+                                onclick="toggleRecording()" title="Record voice answer">
+                            <i class="bi bi-mic-fill" id="micIcon"/>
+                            <span class="mic-pulse" id="micPulse"/>
+                        </button>
+                        <textarea id="answerInput"
+                                  class="answer-textarea"
+                                  placeholder="Type your answer here, or use the mic..."
+                                  rows="3"></textarea>
+                        <button type="button" id="sendBtn" class="btn-send" onclick="submitAnswer()">
+                            <i class="bi bi-send-fill"/>
+                        </button>
+                    </div>
+                    <div class="input-hint text-secondary small">
+                        <i class="bi bi-keyboard"/> Type your answer · or
+                        <i class="bi bi-mic"/> Record voice · Ctrl+Enter to submit
+                    </div>
+                </div>
+
+                <div id="feedbackPanel" class="feedback-panel d-none">
+                    <div class="feedback-header">
+                        <h5>AI Feedback</h5>
+                        <button type="button" class="btn-next" onclick="nextQuestion()" id="nextBtn">
+                            Next Question <i class="bi bi-arrow-right"/>
+                        </button>
+                    </div>
+                    <div class="feedback-score">
+                        <div class="score-ring-container">
+                            <svg class="score-ring" viewBox="0 0 80 80" width="80" height="80">
+                                <circle cx="40" cy="40" r="35" class="ring-track"/>
+                                <circle cx="40" cy="40" r="35" class="ring-fill" id="ringFill"/>
+                                <text x="40" y="45" class="ring-value font-mono" id="ringValue">0</text>
+                            </svg>
+                        </div>
+                        <div class="score-bars">
+                            <div class="score-bar-row">
+                                <span class="text-secondary small">Relevance</span>
+                                <div class="mini-bar"><div class="mini-fill" id="relevanceBar"/></div>
+                                <span class="font-mono small" id="relevanceVal">0</span>
+                            </div>
+                            <div class="score-bar-row">
+                                <span class="text-secondary small">Clarity</span>
+                                <div class="mini-bar"><div class="mini-fill" id="clarityBar"/></div>
+                                <span class="font-mono small" id="clarityVal">0</span>
+                            </div>
+                            <div class="score-bar-row">
+                                <span class="text-secondary small">Sentiment</span>
+                                <div class="mini-bar"><div class="mini-fill" id="sentimentBar"/></div>
+                                <span class="font-mono small" id="sentimentVal">0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="feedback-comment" id="feedbackComment"></div>
+                    <div class="feedback-improvements card-dark p-3 mt-2">
+                        <div class="text-amber small mb-1">💡 To improve</div>
+                        <div id="feedbackImprovements" class="small"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </ui:define>
+
+    <ui:define name="scripts">
+        <h:outputScript library="js" name="session.js"/>
+    </ui:define>
+
+</ui:composition>

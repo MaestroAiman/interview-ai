@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+         https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         version="6.0">
+
+  <display-name>InterviewAI</display-name>
+
+  <!-- JSF Faces Servlet -->
+  <servlet>
+    <servlet-name>Faces Servlet</servlet-name>
+    <servlet-class>jakarta.faces.webapp.FacesServlet</servlet-class>
+    <load-on-startup>1</load-on-startup>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>Faces Servlet</servlet-name>
+    <url-pattern>*.xhtml</url-pattern>
+  </servlet-mapping>
+
+  <!-- JSF Configuration -->
+  <context-param>
+    <param-name>jakarta.faces.PROJECT_STAGE</param-name>
+    <param-value>Development</param-value>
+  </context-param>
+  <context-param>
+    <param-name>jakarta.faces.FACELETS_SKIP_COMMENTS</param-name>
+    <param-value>true</param-value>
+  </context-param>
+  <context-param>
+    <param-name>jakarta.faces.DEFAULT_SUFFIX</param-name>
+    <param-value>.xhtml</param-value>
+  </context-param>
+
+  <!-- CDI / Weld Listener -->
+  <listener>
+    <listener-class>org.jboss.weld.environment.servlet.Listener</listener-class>
+  </listener>
+
+  <!-- Auth Filter (protects all pages except login/register/landing) -->
+  <filter>
+    <filter-name>AuthFilter</filter-name>
+    <filter-class>com.pfa.interviewai.security.AuthFilter</filter-class>
+  </filter>
+  <filter-mapping>
+    <filter-name>AuthFilter</filter-name>
+    <url-pattern>*.xhtml</url-pattern>
+  </filter-mapping>
+
+  <!-- Welcome page -->
+  <welcome-file-list>
+    <welcome-file>landing.xhtml</welcome-file>
+  </welcome-file-list>
+
+  <!-- Error pages -->
+  <error-page>
+    <error-code>404</error-code>
+    <location>/error.xhtml</location>
+  </error-page>
+  <error-page>
+    <error-code>500</error-code>
+    <location>/error.xhtml</location>
+  </error-page>
+
+  <!-- Session timeout: 30 min -->
+  <session-config>
+    <session-timeout>30</session-timeout>
+    <cookie-config>
+      <http-only>true</http-only>
+    </cookie-config>
+  </session-config>
+
+</web-app>

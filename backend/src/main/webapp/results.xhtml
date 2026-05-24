@@ -1,0 +1,130 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets"
+                xmlns:c="jakarta.tags.core"
+                template="/WEB-INF/templates/base.xhtml">
+
+    <ui:define name="pageTitle">Results — InterviewAI</ui:define>
+
+    <ui:define name="content">
+        <f:metadata>
+            <f:viewAction action="#{resultsBean.init}"/>
+        </f:metadata>
+
+        <div class="page-header">
+            <h2 class="page-title">Session Results</h2>
+            <h:link outcome="/setup" styleClass="btn-primary-custom">
+                <i class="bi bi-plus-circle"/> New Session
+            </h:link>
+        </div>
+
+        <h:panelGroup rendered="#{resultsBean.session != null}">
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card-dark stat-card text-center">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-value font-mono" style="font-size:2rem">
+                            #{resultsBean.overallScoreFormatted}
+                        </div>
+                        <div class="stat-label">Overall Score / 10</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card-dark stat-card text-center">
+                        <div class="stat-icon">🎯</div>
+                        <div class="stat-value font-mono">
+                            #{String.format("%.1f", resultsBean.session.relevanceAvg)}
+                        </div>
+                        <div class="stat-label">Relevance Avg</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card-dark stat-card text-center">
+                        <div class="stat-icon">💬</div>
+                        <div class="stat-value font-mono">
+                            #{String.format("%.1f", resultsBean.session.clarityAvg)}
+                        </div>
+                        <div class="stat-label">Clarity Avg</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card-dark stat-card text-center">
+                        <div class="stat-icon">😊</div>
+                        <div class="stat-value font-mono">
+                            #{String.format("%.1f", resultsBean.session.sentimentAvg)}
+                        </div>
+                        <div class="stat-label">Sentiment Avg</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-dark p-4 mb-4">
+                <canvas id="radarChart" height="200"
+                    data-relevance="#{resultsBean.session.relevanceAvg}"
+                    data-clarity="#{resultsBean.session.clarityAvg}"
+                    data-sentiment="#{resultsBean.session.sentimentAvg}"/>
+            </div>
+
+            <div class="card-dark p-4">
+                <h4 class="mb-3">Per-Question Feedback</h4>
+                <c:choose>
+                    <c:when test="#{empty resultsBean.feedbacks}">
+                        <div class="empty-state">
+                            <p>No feedback recorded for this session.</p>
+                        </div>
+                    </c:when>
+                    <c:otherwise>
+                        <div class="accordion" id="feedbackAccordion">
+                            <ui:repeat value="#{resultsBean.feedbacks}" var="fb" varStatus="status">
+                                <div class="accordion-item card-dark mb-2">
+                                    <div class="accordion-header p-3 d-flex justify-content-between align-items-center"
+                                         style="cursor:pointer"
+                                         onclick="this.nextElementSibling.classList.toggle('d-none')">
+                                        <span>Question #{status.index + 1}</span>
+                                        <span class="score-badge">#{String.format("%.1f", fb.overallScore)}/10</span>
+                                    </div>
+                                    <div class="accordion-body d-none p-3">
+                                        <p class="text-secondary small">Your answer:</p>
+                                        <p class="mb-3">#{fb.answerText}</p>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-4">
+                                                <div class="small text-secondary">Relevance</div>
+                                                <div class="font-mono">#{String.format("%.1f", fb.relevanceScore)}/10</div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="small text-secondary">Clarity</div>
+                                                <div class="font-mono">#{String.format("%.1f", fb.clarityScore)}/10</div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="small text-secondary">Sentiment</div>
+                                                <div class="font-mono">#{String.format("%.1f", fb.sentimentScore)}/10</div>
+                                            </div>
+                                        </div>
+                                        <div class="mb-2">
+                                            <span class="text-emerald small">✅ Strengths: </span>
+                                            <span class="small">#{fb.strengths}</span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <span class="text-amber small">💡 Improvements: </span>
+                                            <span class="small">#{fb.improvements}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-secondary small">📝 Suggested: </span>
+                                            <span class="small">#{fb.suggestedAnswer}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </ui:repeat>
+                        </div>
+                    </c:otherwise>
+                </c:choose>
+            </div>
+        </h:panelGroup>
+    </ui:define>
+
+    <ui:define name="scripts">
+        <h:outputScript library="js" name="charts.js"/>
+    </ui:define>
+
+</ui:composition>

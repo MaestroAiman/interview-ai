@@ -1,0 +1,68 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:ui="jakarta.faces.facelets"
+                xmlns:c="jakarta.tags.core">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <span class="logo-icon">🎯</span>
+            <span class="logo-text">InterviewAI</span>
+        </div>
+
+        <nav class="sidebar-nav">
+            <h:link outcome="/dashboard" styleClass="nav-link #{request.servletPath == '/dashboard.xhtml' ? 'active' : ''}">
+                <i class="bi bi-house-door"/>
+                <span>Dashboard</span>
+            </h:link>
+            <h:link outcome="/setup" styleClass="nav-link #{request.servletPath == '/setup.xhtml' ? 'active' : ''}">
+                <i class="bi bi-play-circle"/>
+                <span>Practice</span>
+            </h:link>
+            <h:link outcome="/progress" styleClass="nav-link #{request.servletPath == '/progress.xhtml' ? 'active' : ''}">
+                <i class="bi bi-graph-up"/>
+                <span>Progress</span>
+            </h:link>
+            <h:link outcome="/history" styleClass="nav-link #{request.servletPath == '/history.xhtml' ? 'active' : ''}">
+                <i class="bi bi-clock-history"/>
+                <span>History</span>
+            </h:link>
+            <h:link outcome="/profile" styleClass="nav-link #{request.servletPath == '/profile.xhtml' ? 'active' : ''}">
+                <i class="bi bi-person"/>
+                <span>Profile</span>
+            </h:link>
+
+            <c:if test="#{authBean.currentUser.role == 'ADMIN'}">
+                <div class="nav-divider"/>
+                <h:link outcome="/admin/dashboard" styleClass="nav-link admin-link #{request.servletPath.startsWith('/admin/dashboard') ? 'active' : ''}">
+                    <i class="bi bi-shield-check"/>
+                    <span>Admin</span>
+                </h:link>
+                <h:link outcome="/admin/users" styleClass="nav-link admin-link #{request.servletPath.startsWith('/admin/users') ? 'active' : ''}">
+                    <i class="bi bi-people"/>
+                    <span>Users</span>
+                </h:link>
+            </c:if>
+        </nav>
+
+        <div class="sidebar-footer">
+            <c:if test="#{authBean.currentUser != null}">
+                <div class="user-info">
+                    <div class="user-avatar">
+                        #{authBean.currentUser.name.substring(0,1).toUpperCase()}
+                    </div>
+                    <div>
+                        <div class="user-name">#{authBean.currentUser.name}</div>
+                        <div class="user-role">#{authBean.currentUser.role}</div>
+                    </div>
+                </div>
+            </c:if>
+            <h:form>
+                <h:commandLink action="#{authBean.logout}"
+                               styleClass="btn-logout"
+                               title="Logout">
+                    <i class="bi bi-box-arrow-right"/>
+                </h:commandLink>
+            </h:form>
+        </div>
+    </aside>
+</ui:composition>

@@ -1,0 +1,47 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:f="jakarta.faces.core"
+                xmlns:ui="jakarta.faces.facelets"
+                template="/WEB-INF/templates/base.xhtml">
+
+    <ui:define name="pageTitle">Progress — InterviewAI</ui:define>
+
+    <ui:define name="content">
+        <f:metadata>
+            <f:viewAction action="#{progressBean.init}"/>
+        </f:metadata>
+
+        <div class="page-header">
+            <h2 class="page-title">Your Progress</h2>
+            <p class="page-subtitle">Track your improvement over time</p>
+        </div>
+
+        <div class="card-dark p-4 mb-4">
+            <h5 class="mb-3">Score Trend</h5>
+            <canvas id="progressChart" height="120"/>
+        </div>
+
+        <div class="card-dark p-4">
+            <h5 class="mb-3">Sessions Overview</h5>
+            <canvas id="barChart" height="120"/>
+        </div>
+
+        <div id="progress-scores"
+             data-scores="#{progressBean.scoresJson}"
+             data-labels="#{progressBean.labelsJson}"
+             style="display:none"/>
+    </ui:define>
+
+    <ui:define name="scripts">
+        <h:outputScript library="js" name="charts.js"/>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const el = document.getElementById('progress-scores');
+                const scores = JSON.parse(el.dataset.scores || '[]');
+                const labels = JSON.parse(el.dataset.labels || '[]');
+                initProgressCharts(scores, labels);
+            });
+        </script>
+    </ui:define>
+
+</ui:composition>

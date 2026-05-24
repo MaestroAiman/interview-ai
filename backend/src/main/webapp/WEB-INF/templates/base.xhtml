@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="jakarta.faces.html"
+      xmlns:f="jakarta.faces.core"
+      xmlns:ui="jakarta.faces.facelets"
+      xmlns:c="jakarta.tags.core">
+<h:head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title><ui:insert name="pageTitle">InterviewAI</ui:insert></title>
+
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&amp;family=DM+Sans:ital,wght@0,300;0,400;0,500&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <h:outputStylesheet library="css" name="main.css"/>
+    <ui:insert name="styles"/>
+</h:head>
+<h:body styleClass="app-body">
+
+    <div class="app-wrapper">
+        <ui:include src="/WEB-INF/templates/sidebar.xhtml"/>
+
+        <div class="main-content">
+            <ui:include src="/WEB-INF/templates/topbar.xhtml"/>
+            <main class="page-content">
+                <ui:insert name="content">
+                    Default content
+                </ui:insert>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <ui:insert name="scripts"/>
+</h:body>
+</html>

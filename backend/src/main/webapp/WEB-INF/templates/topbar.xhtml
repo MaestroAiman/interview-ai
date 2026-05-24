@@ -1,0 +1,19 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+                xmlns:h="jakarta.faces.html"
+                xmlns:ui="jakarta.faces.facelets"
+                xmlns:c="jakarta.tags.core">
+
+    <header class="topbar">
+        <div class="topbar-title">
+            <ui:insert name="topbarTitle">InterviewAI</ui:insert>
+        </div>
+        <div class="topbar-user">
+            <c:if test="#{authBean.currentUser != null}">
+                <span class="topbar-name">#{authBean.currentUser.name}</span>
+                <div class="topbar-avatar">
+                    #{authBean.currentUser.name.substring(0,1).toUpperCase()}
+                </div>
+            </c:if>
+        </div>
+    </header>
+</ui:composition>
