@@ -364,9 +364,11 @@ body {
   font-weight: 600;
 }
 
-.badge-technical { background: rgba(59,130,246,0.2); color: var(--blue-light); }
-.badge-hr        { background: rgba(16,185,129,0.2); color: var(--emerald); }
-.badge-domain    { background: rgba(245,158,11,0.2); color: var(--amber); }
+.badge-technical   { background: rgba(59,130,246,0.2); color: var(--blue-light); }
+.badge-hr          { background: rgba(16,185,129,0.2); color: var(--emerald); }
+.badge-domain      { background: rgba(245,158,11,0.2); color: var(--amber); }
+.badge-completed   { background: rgba(16,185,129,0.2); color: var(--emerald); }
+.badge-in-progress { background: rgba(245,158,11,0.2); color: var(--amber); }
 
 /* ── Score badges ── */
 .score-badge {

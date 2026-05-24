@@ -37,6 +37,7 @@
                                     <th>Type</th>
                                     <th>Difficulty</th>
                                     <th>Questions</th>
+                                    <th>Status</th>
                                     <th>Score</th>
                                     <th>Date</th>
                                     <th></th>
@@ -53,13 +54,36 @@
                                         </td>
                                         <td>#{s.difficulty.label}</td>
                                         <td class="font-mono">#{s.questionCount}</td>
-                                        <td><span class="score-badge">#{String.format("%.1f", s.overallScore)}/10</span></td>
+                                        <td>
+                                            <h:panelGroup rendered="#{s.status.name() eq 'COMPLETED'}">
+                                                <span class="badge badge-completed">Completed</span>
+                                            </h:panelGroup>
+                                            <h:panelGroup rendered="#{s.status.name() ne 'COMPLETED'}">
+                                                <span class="badge badge-in-progress">In Progress</span>
+                                            </h:panelGroup>
+                                        </td>
+                                        <td>
+                                            <h:panelGroup rendered="#{s.status.name() eq 'COMPLETED'}">
+                                                <span class="score-badge">#{String.format("%.1f", s.overallScore)}/10</span>
+                                            </h:panelGroup>
+                                            <h:panelGroup rendered="#{s.status.name() ne 'COMPLETED'}">
+                                                <span class="text-secondary">—</span>
+                                            </h:panelGroup>
+                                        </td>
                                         <td class="font-mono text-secondary">#{s.startedAt}</td>
                                         <td>
-                                            <h:link outcome="/results">
-                                                <f:param name="sessionId" value="#{s.id}"/>
-                                                <i class="bi bi-eye"/> Review
-                                            </h:link>
+                                            <h:panelGroup rendered="#{s.status.name() eq 'COMPLETED'}">
+                                                <h:link outcome="/results">
+                                                    <f:param name="sessionId" value="#{s.id}"/>
+                                                    <i class="bi bi-eye"/> Review
+                                                </h:link>
+                                            </h:panelGroup>
+                                            <h:panelGroup rendered="#{s.status.name() ne 'COMPLETED'}">
+                                                <h:link outcome="/session">
+                                                    <f:param name="sessionId" value="#{s.id}"/>
+                                                    <i class="bi bi-play-circle"/> Resume
+                                                </h:link>
+                                            </h:panelGroup>
                                         </td>
                                     </tr>
                                 </ui:repeat>

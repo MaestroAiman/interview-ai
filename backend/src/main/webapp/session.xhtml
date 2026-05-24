@@ -19,6 +19,7 @@
              data-session-id="#{sessionBean.sessionId}"
              data-question-id="#{sessionBean.currentQuestion != null ? sessionBean.currentQuestion.id : ''}"
              data-question-count="#{sessionBean.session != null ? sessionBean.session.questionCount : 0}"
+             data-question-index="#{sessionBean.currentQuestionIndex}"
              style="display:none"/>
 
         <div class="session-layout">

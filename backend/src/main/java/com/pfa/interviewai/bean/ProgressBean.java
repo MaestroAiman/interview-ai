@@ -6,6 +6,8 @@ import jakarta.faces.view.ViewScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 
+import com.pfa.interviewai.model.enums.SessionStatus;
+
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.List;
@@ -23,7 +25,10 @@ public class ProgressBean implements Serializable {
     public void init() {
         try {
             if (authBean.getCurrentUser() != null) {
-                sessions = sessionService.findByUserId(authBean.getCurrentUser().getId());
+                sessions = sessionService.findByUserId(authBean.getCurrentUser().getId())
+                        .stream()
+                        .filter(s -> s.getStatus() == SessionStatus.COMPLETED)
+                        .toList();
             }
         } catch (Exception e) {
             // keep empty list

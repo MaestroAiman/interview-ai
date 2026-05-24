@@ -69,10 +69,12 @@ public class SessionRepository {
         QuerySnapshot query = firebase.getFirestore()
                 .collection(COLLECTION)
                 .whereEqualTo("userId", userId)
-                .orderBy("startedAt", Query.Direction.DESCENDING)
                 .get().get();
         return query.getDocuments().stream()
                 .map(this::fromDoc)
+                .sorted(java.util.Comparator.comparing(
+                    s -> s.getStartedAt() != null ? s.getStartedAt() : "",
+                    java.util.Comparator.reverseOrder()))
                 .toList();
     }
 

@@ -1,6 +1,6 @@
 const data = document.getElementById('session-data').dataset
 let currentQuestionId = data.questionId
-let questionIndex = 1
+let questionIndex = parseInt(data.questionIndex) || 1
 const totalQuestions = parseInt(data.questionCount)
 let timerInterval = null
 let timerSeconds = 60
@@ -158,6 +158,53 @@ function updateProgress() {
         ((questionIndex / totalQuestions) * 100) + '%'
 }
 
+// ── Resume: restore prior Q&A chat history ────────────────────────────────
+async function restoreSessionHistory(sessionId) {
+    try {
+        const resp = await fetch('/interview-ai/api/sessions/' + sessionId)
+        if (!resp.ok) return
+        const state = await resp.json()
+
+        const chatArea = document.getElementById('chatArea')
+        // The server-rendered current-question bubble is the first child.
+        // Insert history BEFORE it so the order becomes:
+        //   Q1 → A1 → Q2 → A2 → … → current-question (server-rendered)
+        const anchor = chatArea.firstElementChild
+
+        const questions = (state.questions || []).sort((a, b) => a.order - b.order)
+        const answers   = state.answers || []
+
+        for (const q of questions) {
+            const ans = answers.find(a => a.questionId === q.id)
+            if (!ans) break   // reached the unanswered question — stop
+
+            const aiBubble = document.createElement('div')
+            aiBubble.className = 'bubble-ai'
+            aiBubble.innerHTML =
+                `<div class="bubble-avatar">AI</div>` +
+                `<div class="bubble-content">${escapeHtml(q.content)}</div>`
+
+            const userBubble = document.createElement('div')
+            userBubble.className = 'bubble-user'
+            userBubble.innerHTML = `<div class="bubble-content">${escapeHtml(ans.text)}</div>`
+
+            chatArea.insertBefore(aiBubble,  anchor)
+            chatArea.insertBefore(userBubble, anchor)
+        }
+        chatArea.scrollTop = chatArea.scrollHeight
+    } catch (e) {
+        console.warn('Could not restore session history:', e)
+    }
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+}
+
 // ── Voice recording (Web Speech API) ──────────────────────────────────────
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
 let recognition = null
@@ -195,9 +242,13 @@ function toggleRecording() {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    updateProgress()   // show correct bar position on resume (no-op for new sessions)
     startTimer()
     document.getElementById('answerInput').addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && e.ctrlKey) submitAnswer()
     })
+    if (questionIndex > 1) {
+        await restoreSessionHistory(data.sessionId)
+    }
 })

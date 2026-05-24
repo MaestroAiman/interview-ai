@@ -143,6 +143,24 @@ public class SessionService {
         return sessionRepository.findByUserId(userId);
     }
 
+    public Question getFirstUnansweredQuestion(String sessionId)
+            throws ExecutionException, InterruptedException {
+        List<Question> questions = sessionRepository.findAllQuestions(sessionId);
+        List<Answer> answers = answerRepository.findBySessionId(sessionId);
+        java.util.Set<String> answeredIds = answers.stream()
+                .map(Answer::getQuestionId)
+                .collect(java.util.stream.Collectors.toSet());
+        return questions.stream()
+                .filter(q -> !answeredIds.contains(q.getId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    public int getAnsweredCount(String sessionId)
+            throws ExecutionException, InterruptedException {
+        return answerRepository.findBySessionId(sessionId).size();
+    }
+
     public List<InterviewSession> findAll() throws ExecutionException, InterruptedException {
         return sessionRepository.findAll();
     }

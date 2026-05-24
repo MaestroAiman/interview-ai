@@ -2,6 +2,7 @@ package com.pfa.interviewai.bean;
 
 import com.pfa.interviewai.model.InterviewSession;
 import com.pfa.interviewai.model.Question;
+import com.pfa.interviewai.model.enums.SessionStatus;
 import com.pfa.interviewai.service.SessionService;
 import jakarta.faces.application.FacesMessage;
 import jakarta.faces.context.FacesContext;
@@ -31,7 +32,17 @@ public class SessionBean implements Serializable {
         sessionId = params.get("sessionId");
         try {
             session = sessionService.findById(sessionId);
-            currentQuestion = sessionService.getFirstQuestion(sessionId);
+            if (session.getStatus() == SessionStatus.IN_PROGRESS) {
+                Question unanswered = sessionService.getFirstUnansweredQuestion(sessionId);
+                if (unanswered != null) {
+                    currentQuestion = unanswered;
+                    currentQuestionIndex = sessionService.getAnsweredCount(sessionId) + 1;
+                } else {
+                    currentQuestion = sessionService.getFirstQuestion(sessionId);
+                }
+            } else {
+                currentQuestion = sessionService.getFirstQuestion(sessionId);
+            }
         } catch (Exception e) {
             FacesContext.getCurrentInstance().addMessage(null,
                 new FacesMessage(FacesMessage.SEVERITY_ERROR,
