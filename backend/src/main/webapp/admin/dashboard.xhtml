@@ -41,45 +41,67 @@
         <!-- All sessions table -->
         <div class="card-dark p-4">
             <h4 class="mb-3">All Sessions</h4>
-            <c:choose>
-                <c:when test="#{empty adminBean.allSessions}">
-                    <div class="empty-state"><p>No sessions in the system yet.</p></div>
-                </c:when>
-                <c:otherwise>
-                    <div class="table-responsive">
-                        <table class="table-dark-custom">
-                            <thead>
-                                <tr>
-                                    <th>User ID</th>
-                                    <th>Position</th>
-                                    <th>Type</th>
-                                    <th>Difficulty</th>
-                                    <th>Score</th>
-                                    <th>Status</th>
-                                    <th>Started</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <ui:repeat value="#{adminBean.allSessions}" var="s">
+
+            <h:form id="sessionsForm">
+                <!-- Error message -->
+                <h:panelGroup rendered="#{not empty adminBean.errorMessage}">
+                    <div class="alert-error mb-3">#{adminBean.errorMessage}</div>
+                </h:panelGroup>
+
+                <c:choose>
+                    <c:when test="#{empty adminBean.allSessions}">
+                        <div class="empty-state"><p>No sessions in the system yet.</p></div>
+                    </c:when>
+                    <c:otherwise>
+                        <div class="table-responsive">
+                            <table class="table-dark-custom">
+                                <thead>
                                     <tr>
-                                        <td class="font-mono text-secondary">#{s.userId.substring(0,8)}&#8230;</td>
-                                        <td class="font-display">#{s.position}</td>
-                                        <td>
-                                            <span class="badge badge-#{s.type.name().toLowerCase()}">
-                                                #{s.type.icon} #{s.type.label}
-                                            </span>
-                                        </td>
-                                        <td>#{s.difficulty.label}</td>
-                                        <td><span class="score-badge">#{String.format("%.1f", s.overallScore)}/10</span></td>
-                                        <td>#{s.status}</td>
-                                        <td class="font-mono text-secondary">#{s.startedAt}</td>
+                                        <th>
+                                            <h:commandLink action="#{adminBean.sortBy('userId')}" styleClass="sort-link">
+                                                User ID
+                                                <h:panelGroup rendered="#{adminBean.sortField eq 'userId'}">
+                                                    <i class="bi bi-arrow-#{adminBean.sortAscending ? 'up' : 'down'} ms-1"/>
+                                                </h:panelGroup>
+                                            </h:commandLink>
+                                        </th>
+                                        <th>Position</th>
+                                        <th>Type</th>
+                                        <th>Difficulty</th>
+                                        <th>Score</th>
+                                        <th>Status</th>
+                                        <th>Started</th>
+                                        <th></th>
                                     </tr>
-                                </ui:repeat>
-                            </tbody>
-                        </table>
-                    </div>
-                </c:otherwise>
-            </c:choose>
+                                </thead>
+                                <tbody>
+                                    <ui:repeat value="#{adminBean.allSessions}" var="s">
+                                        <tr>
+                                            <td class="font-mono text-secondary">#{s.userId.substring(0,8)}&#8230;</td>
+                                            <td class="font-display">#{s.position}</td>
+                                            <td>
+                                                <span class="badge badge-#{s.type.name().toLowerCase()}">
+                                                    #{s.type.icon} #{s.type.label}
+                                                </span>
+                                            </td>
+                                            <td>#{s.difficulty.label}</td>
+                                            <td><span class="score-badge">#{String.format("%.1f", s.overallScore)}/10</span></td>
+                                            <td>#{s.status}</td>
+                                            <td class="font-mono text-secondary">#{s.startedAt}</td>
+                                            <td>
+                                                <h:commandButton value="🗑 Delete"
+                                                    styleClass="btn-danger-small"
+                                                    action="#{adminBean.deleteSession(s.id)}"
+                                                    onclick="return confirm('Permanently delete this session and all its questions, answers and feedback?')"/>
+                                            </td>
+                                        </tr>
+                                    </ui:repeat>
+                                </tbody>
+                            </table>
+                        </div>
+                    </c:otherwise>
+                </c:choose>
+            </h:form>
         </div>
     </ui:define>
 

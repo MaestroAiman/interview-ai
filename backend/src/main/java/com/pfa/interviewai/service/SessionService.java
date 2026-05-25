@@ -165,6 +165,13 @@ public class SessionService {
         return sessionRepository.findAll();
     }
 
+    public void deleteSessionById(String sessionId)
+            throws ExecutionException, InterruptedException {
+        feedbackRepository.deleteBySessionId(sessionId);
+        answerRepository.deleteBySessionId(sessionId);
+        sessionRepository.deleteSession(sessionId);  // also removes questions subcollection
+    }
+
     private float avg(double[] values) {
         if (values.length == 0) return 0f;
         double sum = 0;

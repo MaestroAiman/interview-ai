@@ -3,6 +3,7 @@ package com.pfa.interviewai.repository;
 import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Query;
 import com.google.cloud.firestore.QuerySnapshot;
+import com.google.cloud.firestore.WriteBatch;
 import com.pfa.interviewai.config.FirebaseInitializer;
 import com.pfa.interviewai.model.InterviewSession;
 import com.pfa.interviewai.model.Question;
@@ -134,6 +135,26 @@ public class SessionRepository {
                 .orderBy("startedAt", Query.Direction.DESCENDING)
                 .get().get();
         return query.getDocuments().stream().map(this::fromDoc).toList();
+    }
+
+    public void deleteSession(String sessionId)
+            throws ExecutionException, InterruptedException {
+        // Delete all documents in the questions subcollection first
+        QuerySnapshot questions = firebase.getFirestore()
+                .collection(COLLECTION)
+                .document(sessionId)
+                .collection("questions")
+                .get().get();
+        if (!questions.isEmpty()) {
+            WriteBatch batch = firebase.getFirestore().batch();
+            questions.getDocuments().forEach(doc -> batch.delete(doc.getReference()));
+            batch.commit().get();
+        }
+        // Delete the session document itself
+        firebase.getFirestore()
+                .collection(COLLECTION)
+                .document(sessionId)
+                .delete().get();
     }
 
     public void update(InterviewSession session)

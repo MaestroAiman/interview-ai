@@ -10,6 +10,8 @@ import jakarta.inject.Inject;
 import jakarta.inject.Named;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Named
@@ -31,6 +33,9 @@ public class AdminBean implements Serializable {
     private String currentUserId;
     private String errorMessage;
 
+    private String sortField = "startedAt";
+    private boolean sortAscending = false;
+
     public void init() {
         if (!isAdmin()) return;
         User cu = authBean.getCurrentUser();
@@ -45,9 +50,46 @@ public class AdminBean implements Serializable {
                     .filter(s -> s.getStatus() == SessionStatus.COMPLETED)
                     .mapToDouble(InterviewSession::getOverallScore)
                     .average().orElse(0.0);
+            applySorting();
         } catch (Exception e) {
             // keep empty lists on error
         }
+    }
+
+    public void deleteSession(String sessionId) {
+        if (!isAdmin()) return;
+        try {
+            sessionService.deleteSessionById(sessionId);
+            errorMessage = null;
+            init();
+        } catch (Exception e) {
+            errorMessage = "Failed to delete session: " + e.getMessage();
+        }
+    }
+
+    public void sortBy(String field) {
+        if (field.equals(sortField)) {
+            sortAscending = !sortAscending;
+        } else {
+            sortField = field;
+            sortAscending = true;
+        }
+        applySorting();
+    }
+
+    private void applySorting() {
+        Comparator<InterviewSession> cmp;
+        switch (sortField) {
+            case "userId":
+                cmp = Comparator.comparing(s -> s.getUserId() != null ? s.getUserId() : "");
+                break;
+            default: // "startedAt"
+                cmp = Comparator.comparing(s -> s.getStartedAt() != null ? s.getStartedAt() : "");
+                break;
+        }
+        if (!sortAscending) cmp = cmp.reversed();
+        allSessions = new ArrayList<>(allSessions);
+        allSessions.sort(cmp);
     }
 
     public void promoteUser(String userId) {
@@ -101,4 +143,6 @@ public class AdminBean implements Serializable {
     public double getPlatformAvgScore()          { return platformAvgScore; }
     public String getCurrentUserId()             { return currentUserId; }
     public String getErrorMessage()              { return errorMessage; }
+    public String getSortField()                 { return sortField; }
+    public boolean isSortAscending()             { return sortAscending; }
 }

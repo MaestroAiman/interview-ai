@@ -370,6 +370,28 @@ body {
 .badge-completed   { background: rgba(16,185,129,0.2); color: var(--emerald); }
 .badge-in-progress { background: rgba(245,158,11,0.2); color: var(--amber); }
 
+/* ── Admin: danger button & sort link ── */
+.btn-danger-small {
+  background: rgba(239,68,68,0.15);
+  color: #f87171;
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-danger-small:hover { background: rgba(239,68,68,0.3); }
+
+.sort-link {
+  color: inherit;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.sort-link:hover { color: var(--blue-light); }
+
 /* ── Score badges ── */
 .score-badge {
   font-family: var(--font-mono);

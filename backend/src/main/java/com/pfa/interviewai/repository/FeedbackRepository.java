@@ -2,6 +2,7 @@ package com.pfa.interviewai.repository;
 
 import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.QuerySnapshot;
+import com.google.cloud.firestore.WriteBatch;
 import com.pfa.interviewai.config.FirebaseInitializer;
 import com.pfa.interviewai.model.Feedback;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -41,6 +42,19 @@ public class FeedbackRepository {
         return query.getDocuments().stream()
                 .map(this::fromDoc)
                 .toList();
+    }
+
+    public void deleteBySessionId(String sessionId)
+            throws ExecutionException, InterruptedException {
+        QuerySnapshot docs = firebase.getFirestore()
+                .collection(COLLECTION)
+                .whereEqualTo("sessionId", sessionId)
+                .get().get();
+        if (!docs.isEmpty()) {
+            WriteBatch batch = firebase.getFirestore().batch();
+            docs.getDocuments().forEach(doc -> batch.delete(doc.getReference()));
+            batch.commit().get();
+        }
     }
 
     private Map<String, Object> toMap(Feedback f) {
