@@ -146,9 +146,12 @@ public class SessionService {
     public Question getFirstUnansweredQuestion(String sessionId)
             throws ExecutionException, InterruptedException {
         List<Question> questions = sessionRepository.findAllQuestions(sessionId);
-        List<Answer> answers = answerRepository.findBySessionId(sessionId);
-        java.util.Set<String> answeredIds = answers.stream()
-                .map(Answer::getQuestionId)
+        // Use feedbacks as the progress marker: the legacy submitAnswer() endpoint
+        // only writes to feedbackRepository (not answerRepository), so feedbacks
+        // are the reliable indicator of which questions have been answered.
+        List<Feedback> feedbacks = feedbackRepository.findBySessionId(sessionId);
+        java.util.Set<String> answeredIds = feedbacks.stream()
+                .map(Feedback::getQuestionId)
                 .collect(java.util.stream.Collectors.toSet());
         return questions.stream()
                 .filter(q -> !answeredIds.contains(q.getId()))
@@ -158,7 +161,7 @@ public class SessionService {
 
     public int getAnsweredCount(String sessionId)
             throws ExecutionException, InterruptedException {
-        return answerRepository.findBySessionId(sessionId).size();
+        return feedbackRepository.findBySessionId(sessionId).size();
     }
 
     public List<InterviewSession> findAll() throws ExecutionException, InterruptedException {

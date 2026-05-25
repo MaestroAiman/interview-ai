@@ -172,11 +172,14 @@ async function restoreSessionHistory(sessionId) {
         const anchor = chatArea.firstElementChild
 
         const questions = (state.questions || []).sort((a, b) => a.order - b.order)
-        const answers   = state.answers || []
+        // Use feedbacks as the answered-question marker: the legacy /api/session/answer
+        // endpoint only saves Feedback (not Answer) objects. Each Feedback has
+        // questionId (for matching) and answerText (the user's original answer).
+        const feedbacks = state.feedbacks || []
 
         for (const q of questions) {
-            const ans = answers.find(a => a.questionId === q.id)
-            if (!ans) break   // reached the unanswered question — stop
+            const fb = feedbacks.find(f => f.questionId === q.id)
+            if (!fb) break   // first question without feedback = resume point
 
             const aiBubble = document.createElement('div')
             aiBubble.className = 'bubble-ai'
@@ -186,7 +189,7 @@ async function restoreSessionHistory(sessionId) {
 
             const userBubble = document.createElement('div')
             userBubble.className = 'bubble-user'
-            userBubble.innerHTML = `<div class="bubble-content">${escapeHtml(ans.text)}</div>`
+            userBubble.innerHTML = `<div class="bubble-content">${escapeHtml(fb.answerText || '')}</div>`
 
             chatArea.insertBefore(aiBubble,  anchor)
             chatArea.insertBefore(userBubble, anchor)
