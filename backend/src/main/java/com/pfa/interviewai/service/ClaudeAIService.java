@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pfa.interviewai.config.AppConfig;
 import com.pfa.interviewai.model.Feedback;
 import com.pfa.interviewai.model.Question;
+import com.pfa.interviewai.rest.dto.CvAnalysisResponse;
 import com.pfa.interviewai.rest.dto.SessionSummaryDto;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -455,8 +456,74 @@ public class ClaudeAIService {
     }
 
     // -------------------------------------------------------------------------
+    // New method 6 — CV analysis for interview setup recommendations
+    // -------------------------------------------------------------------------
+
+    public CvAnalysisResponse analyzeCv(String cvText) {
+        String truncated = cvText.length() > 12_000
+            ? cvText.substring(0, 12_000) + "\n[... truncated ...]"
+            : cvText;
+
+        String systemPrompt = JSON_SYSTEM_PROMPT;
+
+        String userPrompt = String.format("""
+            You are an expert recruiter and career advisor.
+            Analyze the following CV and recommend the most appropriate interview configuration.
+
+            CV TEXT:
+            %s
+
+            Return ONLY a JSON object with this exact schema:
+            {
+              "type": "TECHNICAL" | "HR" | "DOMAIN",
+              "position": "<inferred job title, max 50 chars>",
+              "difficulty": "JUNIOR" | "MID" | "SENIOR",
+              "reasoning": "<2-3 sentences explaining your choices>"
+            }
+
+            Rules:
+            - type: TECHNICAL if the CV shows programming/engineering skills;
+                    HR if it emphasizes soft skills, management, or recruitment;
+                    DOMAIN if it shows deep specialization (finance, healthcare, law, etc.)
+            - position: extract or infer the most recent or target job title
+            - difficulty: JUNIOR for 0-2 yrs experience, MID for 2-6 yrs, SENIOR for 6+ yrs or leadership roles
+            - reasoning: briefly justify all three choices
+            """, truncated);
+
+        String response = callClaude(systemPrompt, userPrompt);
+        try {
+            JsonNode node = mapper.readTree(stripCodeFences(response));
+            CvAnalysisResponse result = new CvAnalysisResponse();
+            result.setType(node.get("type").asText());
+            result.setPosition(node.get("position").asText());
+            result.setDifficulty(node.get("difficulty").asText());
+            result.setReasoning(node.has("reasoning") ? node.get("reasoning").asText() : "");
+            return result;
+        } catch (Exception e) {
+            log.warning("analyzeCv parse failed: " + e.getMessage());
+            throw new RuntimeException("CV analysis failed: could not parse AI response", e);
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Private HTTP helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Strips markdown code fences that Claude occasionally adds around JSON
+     * despite being instructed not to (e.g. ```json ... ``` or ``` ... ```).
+     * Idempotent: clean JSON passes through unchanged.
+     */
+    private String stripCodeFences(String raw) {
+        if (raw == null) return "";
+        String s = raw.strip();
+        if (s.startsWith("```")) {
+            int firstNewline = s.indexOf('\n');
+            if (firstNewline != -1) s = s.substring(firstNewline + 1);
+            if (s.endsWith("```")) s = s.substring(0, s.lastIndexOf("```"));
+        }
+        return s.strip();
+    }
 
     private String callClaude(String userPrompt) {
         return callClaude("", userPrompt);

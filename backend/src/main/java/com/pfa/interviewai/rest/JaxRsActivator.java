@@ -1,8 +1,14 @@
 package com.pfa.interviewai.rest;
 
 import jakarta.ws.rs.ApplicationPath;
-import jakarta.ws.rs.core.Application;
+import org.glassfish.jersey.media.multipart.MultiPartFeature;
+import org.glassfish.jersey.server.ResourceConfig;
 
 @ApplicationPath("/api")
-public class JaxRsActivator extends Application {
+public class JaxRsActivator extends ResourceConfig {
+
+    public JaxRsActivator() {
+        packages("com.pfa.interviewai.rest");
+        register(MultiPartFeature.class);
+    }
 }
