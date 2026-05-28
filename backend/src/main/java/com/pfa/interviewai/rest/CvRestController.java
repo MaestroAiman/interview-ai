@@ -2,7 +2,7 @@ package com.pfa.interviewai.rest;
 
 import com.pfa.interviewai.rest.dto.CvAnalysisResponse;
 import com.pfa.interviewai.security.JwtUtil;
-import com.pfa.interviewai.service.ClaudeAIService;
+import com.pfa.interviewai.service.AIProviderFactory;
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
@@ -31,7 +31,7 @@ public class CvRestController {
     private static final Logger log = Logger.getLogger(CvRestController.class.getName());
     private static final int MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
-    @Inject private ClaudeAIService claudeAIService;
+    @Inject private AIProviderFactory aiProviderFactory;
     @Inject private JwtUtil jwtUtil;
 
     @POST
@@ -89,12 +89,14 @@ public class CvRestController {
         }
 
         try {
-            CvAnalysisResponse result = claudeAIService.analyzeCv(cvText);
+            CvAnalysisResponse result = aiProviderFactory.getProvider().analyzeCv(cvText);
             return Response.ok(result).build();
         } catch (RuntimeException e) {
             String msg = e.getMessage() != null ? e.getMessage() : "";
-            if (msg.contains("Anthropic API") || msg.contains("Claude API call failed")) {
-                log.severe("Claude API unavailable during CV analysis: " + msg);
+            if (msg.contains("Anthropic API") || msg.contains("Claude API call failed")
+                    || msg.contains("Ollama server is unreachable")
+                    || msg.contains("Ollama request timed out")) {
+                log.severe("AI service unavailable during CV analysis: " + msg);
                 return Response.status(503)
                     .entity(Map.of("error", "AI service temporarily unavailable")).build();
             }

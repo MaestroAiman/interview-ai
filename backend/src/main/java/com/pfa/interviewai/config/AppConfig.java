@@ -43,4 +43,26 @@ public class AppConfig {
     public int getClaudeTimeoutSeconds() {
         return 30;
     }
+
+    public String getActiveAiProvider() {
+        return System.getenv().getOrDefault("AI_PROVIDER", "ollama");
+    }
+
+    public String getOllamaApiUrl() {
+        return System.getenv().getOrDefault("OLLAMA_API_URL", "http://localhost:11434");
+    }
+
+    public String getOllamaModel() {
+        return System.getenv().getOrDefault("OLLAMA_MODEL", "mistral:7b");
+    }
+
+    public int getOllamaConnectTimeoutMs() {
+        String v = System.getenv("OLLAMA_CONNECT_TIMEOUT_MS");
+        return v != null ? Integer.parseInt(v) : 5000;
+    }
+
+    public int getOllamaReadTimeoutMs() {
+        String v = System.getenv("OLLAMA_READ_TIMEOUT_MS");
+        return v != null ? Integer.parseInt(v) : 180000;
+    }
 }

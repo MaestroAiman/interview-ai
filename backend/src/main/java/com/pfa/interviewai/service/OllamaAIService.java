@@ -7,6 +7,7 @@ import com.pfa.interviewai.model.Feedback;
 import com.pfa.interviewai.model.Question;
 import com.pfa.interviewai.rest.dto.CvAnalysisResponse;
 import com.pfa.interviewai.rest.dto.SessionSummaryDto;
+import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
@@ -24,47 +25,73 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 @ApplicationScoped
-@Named("claude")
-public class ClaudeAIService implements AIProvider {
+@Named("ollama")
+public class OllamaAIService implements AIProvider {
 
-    private static final Logger log = Logger.getLogger(ClaudeAIService.class.getName());
+    private static final Logger log = Logger.getLogger(OllamaAIService.class.getName());
 
-    private static final String JSON_SYSTEM_PROMPT =
-        "You are an AI interview assistant. Respond ONLY with valid JSON. " +
-        "No markdown, no code blocks, no explanation, no preamble. " +
-        "The response must be directly parseable as JSON.";
+    private static final String SYSTEM_PROMPT =
+        "You are InterviewAI, a professional interview simulator. " +
+        "CRITICAL RULE: You ALWAYS respond with valid JSON only. " +
+        "Never add markdown formatting, code blocks, explanations, or any text outside the JSON object. " +
+        "Your entire response must be directly parseable by JSON.parse() with no preprocessing.";
 
     @Inject
     private AppConfig appConfig;
 
     private final ObjectMapper mapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private HttpClient httpClient;
+
+    @PostConstruct
+    private void init() {
+        httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofMillis(appConfig.getOllamaConnectTimeoutMs()))
+            .build();
+    }
 
     // -------------------------------------------------------------------------
-    // Existing method — kept for JSF/legacy compatibility
+    // AIProvider interface — legacy methods
     // -------------------------------------------------------------------------
 
+    @Override
     public List<String> generateQuestions(String type, String position,
                                            String difficulty, int count) {
-        String prompt = String.format("""
-            You are an expert interviewer. Generate exactly %d interview questions
-            for a %s-level %s candidate. Interview type: %s.
-            Rules:
-            - Return ONLY a JSON array of strings: ["question1", "question2", ...]
-            - No explanations, no numbering, no markdown, no backticks
-            - Questions must be progressively more challenging
-            - TECHNICAL: algorithms, system design, debugging, code review
-            - HR: behavioral (STAR), motivational, situational judgment
-            - DOMAIN: domain-specific technical and business knowledge
+        String userPrompt = String.format("""
+            Generate exactly %d interview questions for a %s-level %s candidate. Interview type: %s.
+            Respond ONLY with a JSON object in exactly this format (replace the example questions with real new ones tailored to the position):
+            {
+              "questions": [
+                "Walk me through your design process when starting a new project from scratch.",
+                "Describe a time you had to defend a design decision to a skeptical stakeholder.",
+                "How do you measure the success of a user experience you have shipped?"
+              ]
+            }
+            Each item must be a complete, non-empty interview question specific to the candidate's position.
+            Questions must progress from easier to harder.
             """, count, difficulty, position, type);
 
-        String response = callClaude(prompt);
+        String response = null;
         try {
+            response = callOllama(SYSTEM_PROMPT, userPrompt);
             JsonNode node = mapper.readTree(response);
             List<String> questions = new ArrayList<>();
-            node.forEach(q -> questions.add(q.asText()));
+            JsonNode arr = node.get("questions");
+            if (arr != null && arr.isArray()) {
+                arr.forEach(q -> {
+                    String text;
+                    if (q.isTextual()) {
+                        text = q.asText();
+                    } else if (q.isObject() && q.has("question")) {
+                        text = q.get("question").asText();
+                    } else {
+                        text = q.asText();
+                    }
+                    if (text != null && !text.isBlank()) questions.add(text);
+                });
+            }
             return questions;
         } catch (Exception e) {
+            log.warning("generateQuestions failed: " + e.getMessage() + " | Raw: " + response);
             return List.of(
                 "Tell me about yourself and your background.",
                 "What are your main technical strengths?",
@@ -75,52 +102,50 @@ public class ClaudeAIService implements AIProvider {
         }
     }
 
+    @Override
     public Feedback analyzeAnswer(String question, String answerText,
                                    String position, String type,
                                    String sessionId, String questionId) {
-        String prompt = String.format("""
-            You are an expert interviewer evaluating a job candidate's answer.
+        String userPrompt = String.format("""
+            Evaluate this interview answer and return a JSON assessment.
             Position: %s | Interview type: %s
             Question: %s
-            Candidate's answer: %s
+            Candidate answer: %s
 
-            Respond ONLY with a JSON object (no markdown, no backticks):
+            Respond ONLY with a JSON object in exactly this format (replace the example values with your real assessment):
             {
-              "relevanceScore": <float 0-10>,
-              "clarityScore": <float 0-10>,
-              "sentimentScore": <float 0-10>,
-              "overallScore": <float 0-10>,
-              "strengths": "<1-2 sentences on what was good>",
-              "improvements": "<1-2 sentences on what was missing>",
-              "suggestedAnswer": "<a model answer in 2-3 sentences>",
-              "shortComment": "<one concise encouraging sentence>"
+              "relevanceScore": 7.5,
+              "clarityScore": 6.0,
+              "sentimentScore": 8.0,
+              "overallScore": 7.2,
+              "strengths": "The candidate demonstrated clear understanding of the topic.",
+              "improvements": "The answer lacked specific examples or technical depth.",
+              "suggestedAnswer": "A strong answer would include specific examples and demonstrate hands-on experience.",
+              "shortComment": "Good start — add concrete examples to strengthen your answer."
             }
-
-            Scoring:
-            - relevanceScore: how directly the answer addresses the question (0-10)
-            - clarityScore: structure, articulation, vocabulary (0-10)
-            - sentimentScore: confidence and professional tone (0=negative, 10=positive)
-            - overallScore: weighted (relevance 40%% + clarity 35%% + sentiment 25%%)
+            All score fields must be floats between 0.0 and 10.0. All text fields must be non-empty strings.
             """, position, type, question, answerText);
 
-        String response = callClaude(prompt);
+        String response = null;
         try {
+            response = callOllama(SYSTEM_PROMPT, userPrompt);
             JsonNode node = mapper.readTree(response);
             return Feedback.builder()
                     .id(UUID.randomUUID().toString())
                     .sessionId(sessionId)
                     .questionId(questionId)
                     .answerText(answerText)
-                    .relevanceScore((float) node.get("relevanceScore").asDouble())
-                    .clarityScore((float) node.get("clarityScore").asDouble())
-                    .sentimentScore((float) node.get("sentimentScore").asDouble())
-                    .overallScore((float) node.get("overallScore").asDouble())
-                    .strengths(node.get("strengths").asText())
-                    .improvements(node.get("improvements").asText())
-                    .suggestedAnswer(node.get("suggestedAnswer").asText())
-                    .shortComment(node.get("shortComment").asText())
+                    .relevanceScore(node.has("relevanceScore") ? (float) node.get("relevanceScore").asDouble() : 5f)
+                    .clarityScore(node.has("clarityScore") ? (float) node.get("clarityScore").asDouble() : 5f)
+                    .sentimentScore(node.has("sentimentScore") ? (float) node.get("sentimentScore").asDouble() : 5f)
+                    .overallScore(node.has("overallScore") ? (float) node.get("overallScore").asDouble() : 5f)
+                    .strengths(node.has("strengths") ? node.get("strengths").asText() : "")
+                    .improvements(node.has("improvements") ? node.get("improvements").asText() : "")
+                    .suggestedAnswer(node.has("suggestedAnswer") ? node.get("suggestedAnswer").asText() : "")
+                    .shortComment(node.has("shortComment") ? node.get("shortComment").asText() : "")
                     .build();
         } catch (Exception e) {
+            log.warning("analyzeAnswer failed: " + e.getMessage() + " | Raw: " + response);
             return Feedback.builder()
                     .id(UUID.randomUUID().toString())
                     .sessionId(sessionId)
@@ -136,9 +161,10 @@ public class ClaudeAIService implements AIProvider {
     }
 
     // -------------------------------------------------------------------------
-    // New method 1 — adaptive single-question generation
+    // AIProvider interface — adaptive methods
     // -------------------------------------------------------------------------
 
+    @Override
     public Question generateAdaptiveQuestion(String interviewType, String position,
                                               String adaptiveDifficulty,
                                               List<String> askedQuestions) {
@@ -148,28 +174,28 @@ public class ClaudeAIService implements AIProvider {
         }
 
         String userPrompt = String.format("""
-            Generate ONE interview question for the following context.
-            Interview type: %s
-            Target position: %s
-            Difficulty level: %s
+            Generate ONE interview question for this context:
+            - Interview type: %s
+            - Target position: %s
+            - Difficulty level: %s
+            - Already asked (DO NOT repeat any of these): %s
 
-            Already asked questions (DO NOT repeat or closely paraphrase any of these):
-            %s
-
-            Return ONLY a JSON object matching this exact schema:
+            Respond ONLY with a JSON object in exactly this format (replace example values with a real new question for the position):
             {
-              "question": "the full question text",
-              "difficulty": "beginner|intermediate|advanced",
-              "category": "short category label (e.g. System Design, Behavioral, Java, SQL)",
-              "estimated_duration_seconds": <integer, typical 60-300>,
-              "expected_keywords": ["keyword1", "keyword2", "keyword3"]
+              "question": "Walk me through how you would design a checkout flow for a mobile e-commerce app.",
+              "difficulty": "intermediate",
+              "category": "UX Design",
+              "estimated_duration_seconds": 180,
+              "expected_keywords": ["user research", "wireframes", "usability"]
             }
+            The "difficulty" field must be exactly one of: beginner, intermediate, advanced.
             """,
             interviewType, position, adaptiveDifficulty,
             askedList.length() > 0 ? askedList.toString() : "(none yet)");
 
-        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt);
+        String response = null;
         try {
+            response = callOllama(SYSTEM_PROMPT, userPrompt);
             JsonNode node = mapper.readTree(response);
             List<String> keywords = new ArrayList<>();
             if (node.has("expected_keywords") && node.get("expected_keywords").isArray()) {
@@ -185,7 +211,7 @@ public class ClaudeAIService implements AIProvider {
                     .expectedKeywords(keywords)
                     .build();
         } catch (Exception e) {
-            log.warning("generateAdaptiveQuestion parse failed: " + e.getMessage());
+            log.warning("generateAdaptiveQuestion failed: " + e.getMessage() + " | Raw: " + response);
             return Question.builder()
                     .id(UUID.randomUUID().toString())
                     .content("Tell me about a challenging project you worked on and how you overcame the difficulties.")
@@ -197,38 +223,37 @@ public class ClaudeAIService implements AIProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // New method 2 — detailed multi-dimension answer analysis
-    // -------------------------------------------------------------------------
-
+    @Override
     public Feedback analyzeAnswerDetailed(String question, String category,
                                            String answerText,
                                            String sessionId, String questionId) {
         String userPrompt = String.format("""
-            Evaluate the following interview answer across 5 dimensions.
-            Question category: %s
+            Analyze this interview answer objectively.
             Question: %s
-            Candidate answer: %s
+            Category: %s
+            Candidate's answer: %s
 
-            Score each dimension from 0 to 100 (integers). Return ONLY this JSON:
+            Respond ONLY with a JSON object in exactly this format (replace example values with your real assessment):
             {
               "scores": {
-                "relevance": <0-100>,
-                "clarity": <0-100>,
-                "depth": <0-100>,
-                "vocabulary": <0-100>,
-                "examples": <0-100>
+                "relevance": 75,
+                "clarity": 68,
+                "depth": 60,
+                "vocabulary": 70,
+                "examples": 55
               },
-              "global_score": <0-100, weighted average: relevance 25%% + clarity 20%% + depth 25%% + vocabulary 15%% + examples 15%%>,
-              "level_assessment": "junior|mid|senior",
-              "key_strengths": ["strength1", "strength2"],
-              "critical_gaps": ["gap1", "gap2"]
+              "global_score": 67,
+              "level_assessment": "mid",
+              "key_strengths": ["Clear structure", "Practical examples"],
+              "critical_gaps": ["Limited technical depth", "No metrics cited"]
             }
+            All score fields must be integers 0-100. The "level_assessment" must be exactly one of: junior, mid, senior.
             """,
-            category != null ? category : "General", question, answerText);
+            question, category != null ? category : "General", answerText);
 
-        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt);
+        String response = null;
         try {
+            response = callOllama(SYSTEM_PROMPT, userPrompt);
             JsonNode node = mapper.readTree(response);
             JsonNode scores = node.get("scores");
             float relevance  = (float) scores.get("relevance").asDouble();
@@ -263,7 +288,7 @@ public class ClaudeAIService implements AIProvider {
                     .criticalGaps(criticalGaps)
                     .build();
         } catch (Exception e) {
-            log.warning("analyzeAnswerDetailed parse failed: " + e.getMessage());
+            log.warning("analyzeAnswerDetailed failed: " + e.getMessage() + " | Raw: " + response);
             return Feedback.builder()
                     .id(UUID.randomUUID().toString())
                     .sessionId(sessionId)
@@ -278,30 +303,26 @@ public class ClaudeAIService implements AIProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // New method 3 — actionable feedback generation
-    // -------------------------------------------------------------------------
-
+    @Override
     public Feedback generateDetailedFeedback(String question, String answerText,
                                               String category, Feedback analysis,
                                               String sessionId, String questionId) {
         String userPrompt = String.format("""
-            Provide actionable feedback for the following interview answer.
-            Question category: %s
+            Generate constructive interview feedback.
             Question: %s
-            Candidate answer: %s
-            Scores — Relevance: %.0f/100, Clarity: %.0f/100, Depth: %.0f/100, Vocabulary: %.0f/100, Examples: %.0f/100
+            Candidate's answer: %s
+            Scores: Relevance %.0f/100, Clarity %.0f/100, Depth %.0f/100, Vocabulary %.0f/100, Examples %.0f/100
 
-            Return ONLY this JSON:
+            Respond ONLY with a JSON object in exactly this format (replace example values with your real feedback):
             {
-              "positive_points": "2-3 sentences on what the candidate did well",
-              "improvement_points": "2-3 sentences on what was lacking or could be stronger",
-              "concrete_advice": "1-2 specific, actionable steps to improve this type of answer",
-              "example_answer": "a model answer in 3-4 sentences demonstrating best practice",
-              "next_difficulty": "easier|same|harder"
+              "positive_points": "The candidate showed strong understanding of user-centered design principles and applied them throughout.",
+              "improvement_points": "The answer would be stronger with specific metrics and a concrete example from past work.",
+              "concrete_advice": "Practice the STAR method to add structured examples to every answer.",
+              "example_answer": "When redesigning the onboarding flow at Acme, I started with user interviews, mapped the journey, prototyped three variants, and A/B tested - the chosen design reduced drop-off by 23 percent.",
+              "next_difficulty": "same"
             }
+            The "next_difficulty" field must be exactly one of: easier, same, harder.
             """,
-            category != null ? category : "General",
             question, answerText,
             analysis.getRelevanceScore() * 10,
             analysis.getClarityScore() * 10,
@@ -309,21 +330,21 @@ public class ClaudeAIService implements AIProvider {
             analysis.getVocabularyScore(),
             analysis.getExamplesScore());
 
-        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt);
+        String response = null;
         try {
+            response = callOllama(SYSTEM_PROMPT, userPrompt);
             JsonNode node = mapper.readTree(response);
-            String positivePoints   = node.has("positive_points") ? node.get("positive_points").asText() : "";
+            String positivePoints    = node.has("positive_points")    ? node.get("positive_points").asText()    : "";
             String improvementPoints = node.has("improvement_points") ? node.get("improvement_points").asText() : "";
-            String concreteAdvice   = node.has("concrete_advice") ? node.get("concrete_advice").asText() : "";
-            String exampleAnswer    = node.has("example_answer") ? node.get("example_answer").asText() : "";
-            String nextDifficulty   = node.has("next_difficulty") ? node.get("next_difficulty").asText() : "same";
+            String concreteAdvice    = node.has("concrete_advice")    ? node.get("concrete_advice").asText()    : "";
+            String exampleAnswer     = node.has("example_answer")     ? node.get("example_answer").asText()     : "";
+            String nextDifficulty    = node.has("next_difficulty")    ? node.get("next_difficulty").asText()    : "same";
 
             return Feedback.builder()
                     .id(analysis.getId())
                     .sessionId(sessionId)
                     .questionId(questionId)
                     .answerText(answerText)
-                    // legacy fields mapped for JSF backward compat
                     .relevanceScore(analysis.getRelevanceScore())
                     .clarityScore(analysis.getClarityScore())
                     .sentimentScore(0f)
@@ -332,7 +353,6 @@ public class ClaudeAIService implements AIProvider {
                     .improvements(improvementPoints)
                     .suggestedAnswer(exampleAnswer)
                     .shortComment(concreteAdvice)
-                    // new dimension scores from analysis
                     .depthScore(analysis.getDepthScore())
                     .vocabularyScore(analysis.getVocabularyScore())
                     .examplesScore(analysis.getExamplesScore())
@@ -340,7 +360,6 @@ public class ClaudeAIService implements AIProvider {
                     .levelAssessment(analysis.getLevelAssessment())
                     .keyStrengths(analysis.getKeyStrengths())
                     .criticalGaps(analysis.getCriticalGaps())
-                    // new feedback fields
                     .positivePoints(positivePoints)
                     .improvementPoints(improvementPoints)
                     .concreteAdvice(concreteAdvice)
@@ -348,7 +367,7 @@ public class ClaudeAIService implements AIProvider {
                     .nextDifficulty(nextDifficulty)
                     .build();
         } catch (Exception e) {
-            log.warning("generateDetailedFeedback parse failed: " + e.getMessage());
+            log.warning("generateDetailedFeedback failed: " + e.getMessage() + " | Raw: " + response);
             return Feedback.builder()
                     .id(analysis.getId())
                     .sessionId(sessionId)
@@ -376,10 +395,7 @@ public class ClaudeAIService implements AIProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // New method 4 — end-of-session summary
-    // -------------------------------------------------------------------------
-
+    @Override
     public SessionSummaryDto generateSessionSummary(List<Map<String, Object>> qaPairs) {
         StringBuilder context = new StringBuilder();
         for (int i = 0; i < qaPairs.size(); i++) {
@@ -390,23 +406,25 @@ public class ClaudeAIService implements AIProvider {
         }
 
         String userPrompt = String.format("""
-            Generate a comprehensive interview session summary based on the following Q&A pairs:
-
+            Generate a complete interview session summary.
+            Questions and scores:
             %s
 
-            Return ONLY this JSON:
+            Respond ONLY with a JSON object in exactly this format (replace example values with your real assessment):
             {
-              "overall_score": <0-100, float>,
-              "global_assessment": "2-3 sentences describing the candidate's overall performance",
-              "top_strengths": ["strength1", "strength2", "strength3"],
-              "priority_improvements": ["improvement1", "improvement2", "improvement3"],
-              "recommended_resources": ["resource1", "resource2"],
-              "readiness_level": "not_ready|almost_ready|ready"
+              "overall_score": 72.5,
+              "global_assessment": "The candidate demonstrated solid foundational knowledge and good communication, with room to grow in technical depth.",
+              "top_strengths": ["Clear communication", "Structured thinking", "Practical examples"],
+              "priority_improvements": ["Deepen technical knowledge", "Use specific metrics"],
+              "recommended_resources": ["Don't Make Me Think by Steve Krug", "Nielsen Norman Group articles"],
+              "readiness_level": "almost_ready"
             }
+            The "overall_score" must be a float 0.0-100.0. The "readiness_level" must be exactly one of: not_ready, almost_ready, ready.
             """, context.toString());
 
-        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt);
+        String response = null;
         try {
+            response = callOllama(SYSTEM_PROMPT, userPrompt);
             JsonNode node = mapper.readTree(response);
 
             List<String> topStrengths = new ArrayList<>();
@@ -430,7 +448,7 @@ public class ClaudeAIService implements AIProvider {
             dto.setReadinessLevel(node.has("readiness_level") ? node.get("readiness_level").asText() : "almost_ready");
             return dto;
         } catch (Exception e) {
-            log.warning("generateSessionSummary parse failed: " + e.getMessage());
+            log.warning("generateSessionSummary failed: " + e.getMessage() + " | Raw: " + response);
             SessionSummaryDto dto = new SessionSummaryDto();
             dto.setOverallScore(50f);
             dto.setGlobalAssessment("Session completed. Summary generation encountered an error.");
@@ -442,68 +460,59 @@ public class ClaudeAIService implements AIProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // New method 5 — API health check
-    // -------------------------------------------------------------------------
-
+    @Override
     public boolean pingApi() {
         try {
-            String response = callClaude(JSON_SYSTEM_PROMPT, "Respond with: {\"status\":\"ok\"}");
+            String response = callOllama(SYSTEM_PROMPT, "Respond with: {\"status\":\"ok\"}");
             JsonNode node = mapper.readTree(response);
             return node.has("status") && "ok".equals(node.get("status").asText());
         } catch (Exception e) {
-            log.warning("Claude API ping failed: " + e.getMessage());
+            log.warning("Ollama ping failed: " + e.getMessage());
             return false;
         }
     }
 
-    // -------------------------------------------------------------------------
-    // New method 6 — CV analysis for interview setup recommendations
-    // -------------------------------------------------------------------------
-
+    @Override
     public CvAnalysisResponse analyzeCv(String cvText) {
-        String truncated = cvText.length() > 12_000
-            ? cvText.substring(0, 12_000) + "\n[... truncated ...]"
+        String truncated = cvText.length() > 4_000
+            ? cvText.substring(0, 4_000) + "\n[... truncated ...]"
             : cvText;
 
-        String systemPrompt = JSON_SYSTEM_PROMPT;
-
         String userPrompt = String.format("""
-            You are an expert recruiter and career advisor.
-            Analyze the following CV and recommend the most appropriate interview configuration.
+            You are an expert recruiter. Analyze the following CV and recommend the most appropriate interview configuration.
 
             CV TEXT:
             %s
 
-            Return ONLY a JSON object with this exact schema:
+            Respond ONLY with a JSON object in exactly this format (replace example values with your real analysis of the CV above):
             {
-              "type": "TECHNICAL" | "HR" | "DOMAIN",
-              "position": "<inferred job title, max 50 chars>",
-              "difficulty": "JUNIOR" | "MID" | "SENIOR",
-              "reasoning": "<2-3 sentences explaining your choices>"
+              "type": "TECHNICAL",
+              "position": "Senior Software Engineer",
+              "difficulty": "SENIOR",
+              "reasoning": "The CV shows 8+ years of backend engineering with leadership of distributed systems projects, indicating a senior technical role."
             }
-
-            Rules:
-            - type: TECHNICAL if the CV shows programming/engineering skills;
-                    HR if it emphasizes soft skills, management, or recruitment;
-                    DOMAIN if it shows deep specialization (finance, healthcare, law, etc.)
-            - position: extract or infer the most recent or target job title
-            - difficulty: JUNIOR for 0-2 yrs experience, MID for 2-6 yrs, SENIOR for 6+ yrs or leadership roles
-            - reasoning: briefly justify all three choices
+            The "type" field must be exactly one of: TECHNICAL, HR, DOMAIN.
+            The "difficulty" field must be exactly one of: JUNIOR, MID, SENIOR.
             """, truncated);
 
-        String response = callClaude(systemPrompt, userPrompt);
+        String rawResponse = null;
         try {
-            JsonNode node = mapper.readTree(stripCodeFences(response));
+            rawResponse = callOllama(SYSTEM_PROMPT, userPrompt);
+            JsonNode node = mapper.readTree(rawResponse);
             CvAnalysisResponse result = new CvAnalysisResponse();
-            result.setType(node.get("type").asText());
-            result.setPosition(node.get("position").asText());
-            result.setDifficulty(node.get("difficulty").asText());
+            result.setType(node.has("type") ? node.get("type").asText() : "HR");
+            result.setPosition(node.has("position") ? node.get("position").asText() : "Professional");
+            result.setDifficulty(node.has("difficulty") ? node.get("difficulty").asText() : "MID");
             result.setReasoning(node.has("reasoning") ? node.get("reasoning").asText() : "");
             return result;
         } catch (Exception e) {
-            log.warning("analyzeCv parse failed: " + e.getMessage());
-            throw new RuntimeException("CV analysis failed: could not parse AI response", e);
+            log.warning("analyzeCv failed: " + e.getMessage() + " | Raw: " + rawResponse);
+            CvAnalysisResponse fallback = new CvAnalysisResponse();
+            fallback.setType("HR");
+            fallback.setPosition("Professional");
+            fallback.setDifficulty("MID");
+            fallback.setReasoning("Automatic CV analysis was unavailable. Please configure your interview manually.");
+            return fallback;
         }
     }
 
@@ -511,69 +520,103 @@ public class ClaudeAIService implements AIProvider {
     // Private HTTP helpers
     // -------------------------------------------------------------------------
 
-    /**
-     * Strips markdown code fences that Claude occasionally adds around JSON
-     * despite being instructed not to (e.g. ```json ... ``` or ``` ... ```).
-     * Idempotent: clean JSON passes through unchanged.
-     */
-    private String stripCodeFences(String raw) {
-        if (raw == null) return "";
-        String s = raw.strip();
-        if (s.startsWith("```")) {
-            int firstNewline = s.indexOf('\n');
-            if (firstNewline != -1) s = s.substring(firstNewline + 1);
-            if (s.endsWith("```")) s = s.substring(0, s.lastIndexOf("```"));
-        }
-        return s.strip();
-    }
-
-    private String callClaude(String userPrompt) {
-        return callClaude("", userPrompt);
-    }
-
-    private String callClaude(String systemPrompt, String userPrompt) {
+    private String callOllama(String systemPrompt, String userPrompt) {
         long start = System.currentTimeMillis();
-        log.info(String.format("Claude API call — promptLength=%d", userPrompt.length()));
-        try {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("model", appConfig.getClaudeModel());
-            body.put("max_tokens", appConfig.getClaudeMaxTokens());
-            if (systemPrompt != null && !systemPrompt.isBlank()) {
-                body.put("system", systemPrompt);
-            }
-            body.put("messages", List.of(Map.of("role", "user", "content", userPrompt)));
+        log.info(String.format("Ollama API call — model=%s, promptLength=%d",
+            appConfig.getOllamaModel(), userPrompt.length()));
 
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", systemPrompt));
+        messages.add(Map.of("role", "user", "content", userPrompt));
+
+        Map<String, Object> options = new LinkedHashMap<>();
+        options.put("temperature", 0.1);
+        options.put("num_predict", 1500);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", appConfig.getOllamaModel());
+        body.put("stream", false);
+        body.put("format", "json");
+        body.put("messages", messages);
+        body.put("options", options);
+
+        String rawContent = null;
+        try {
+            String requestBody = mapper.writeValueAsString(body);
             HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(appConfig.getClaudeApiUrl()))
-                .header("x-api-key", appConfig.getClaudeApiKey())
-                .header("anthropic-version", "2023-06-01")
+                .uri(URI.create(appConfig.getOllamaApiUrl() + "/api/chat"))
                 .header("Content-Type", "application/json")
-                .timeout(Duration.ofSeconds(appConfig.getClaudeTimeoutSeconds()))
-                .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
+                .timeout(Duration.ofMillis(appConfig.getOllamaReadTimeoutMs()))
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
 
             HttpResponse<String> response = httpClient.send(
                 request, HttpResponse.BodyHandlers.ofString());
 
             long elapsed = System.currentTimeMillis() - start;
-            log.info(String.format("Claude API response — status=%d, elapsed=%dms",
+            log.info(String.format("Ollama API response — status=%d, elapsed=%dms",
                 response.statusCode(), elapsed));
 
             if (response.statusCode() != 200) {
-                throw new RuntimeException("Anthropic API returned " + response.statusCode()
+                throw new RuntimeException("Ollama returned HTTP " + response.statusCode()
                     + ": " + response.body());
             }
 
             JsonNode root = mapper.readTree(response.body());
-            JsonNode content = root.get("content");
-            if (content == null || !content.isArray() || content.isEmpty()) {
-                throw new RuntimeException("Unexpected API response: " + response.body());
-            }
-            return content.get(0).get("text").asText();
+            rawContent = root.get("message").get("content").asText();
+            String preview = rawContent.length() > 500
+                ? rawContent.substring(0, 500) + "..."
+                : rawContent;
+            log.info("Ollama raw content: " + preview);
+            return extractJson(sanitize(rawContent));
 
+        } catch (java.net.ConnectException | java.net.http.HttpConnectTimeoutException e) {
+            throw new RuntimeException(
+                "Ollama server is unreachable. Make sure Ollama is running: ollama serve", e);
+        } catch (java.net.http.HttpTimeoutException e) {
+            throw new RuntimeException(
+                "Ollama request timed out after " + appConfig.getOllamaReadTimeoutMs()
+                + "ms. Mistral 7B on CPU may be too slow for this prompt — try a shorter input or larger timeout.", e);
+        } catch (RuntimeException e) {
+            throw e;
         } catch (Exception e) {
-            log.severe("Claude API error: " + e.getMessage());
-            throw new RuntimeException("Claude API call failed: " + e.getMessage(), e);
+            if (rawContent != null) {
+                log.severe("Ollama response parsing failed. Raw response: " + rawContent);
+                throw new RuntimeException(
+                    "Ollama response parsing failed. Raw: " + rawContent, e);
+            }
+            throw new RuntimeException(
+                "Ollama server is unreachable. Make sure Ollama is running: ollama serve", e);
         }
+    }
+
+    private String sanitize(String raw) {
+        if (raw == null) return "";
+        return raw
+            .replaceAll("(?s)```json\\s*", "")
+            .replaceAll("(?s)```\\s*", "")
+            .trim();
+    }
+
+    private String extractJson(String text) {
+        if (text == null || text.isEmpty()) return text;
+        int start = text.indexOf('{');
+        if (start == -1) return text;
+        int depth = 0;
+        boolean inString = false;
+        boolean escape = false;
+        for (int i = start; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (escape) { escape = false; continue; }
+            if (c == '\\' && inString) { escape = true; continue; }
+            if (c == '"') { inString = !inString; continue; }
+            if (inString) continue;
+            if (c == '{') depth++;
+            else if (c == '}') {
+                depth--;
+                if (depth == 0) return text.substring(start, i + 1);
+            }
+        }
+        return text.substring(start);
     }
 }

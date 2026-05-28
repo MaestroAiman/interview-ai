@@ -35,7 +35,7 @@ public class SessionService {
     @Inject private SessionRepository sessionRepository;
     @Inject private FeedbackRepository feedbackRepository;
     @Inject private AnswerRepository answerRepository;
-    @Inject private ClaudeAIService claudeAIService;
+    @Inject private AIProviderFactory aiProviderFactory;
 
     public String startSession(InterviewType type, String position,
                                 Difficulty difficulty, int questionCount,
@@ -55,7 +55,7 @@ public class SessionService {
 
         sessionRepository.save(session);
 
-        List<String> questions = claudeAIService.generateQuestions(
+        List<String> questions = aiProviderFactory.getProvider().generateQuestions(
             type.name(), position, difficulty.name(), questionCount);
 
         for (int i = 0; i < questions.size(); i++) {
@@ -94,7 +94,7 @@ public class SessionService {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Question not found"));
 
-        Feedback feedback = claudeAIService.analyzeAnswer(
+        Feedback feedback = aiProviderFactory.getProvider().analyzeAnswer(
             currentQ.getContent(),
             req.getAnswerText(),
             session.getPosition(),
@@ -203,7 +203,7 @@ public class SessionService {
                 .build();
         sessionRepository.save(session);
 
-        Question firstQuestion = claudeAIService.generateAdaptiveQuestion(
+        Question firstQuestion = aiProviderFactory.getProvider().generateAdaptiveQuestion(
             type.name(), position, "intermediate", List.of());
         firstQuestion.setSessionId(session.getId());
         firstQuestion.setOrder(1);
@@ -236,10 +236,10 @@ public class SessionService {
                 .submittedAt(Instant.now().toString())
                 .build());
 
-        Feedback analysis = claudeAIService.analyzeAnswerDetailed(
+        Feedback analysis = aiProviderFactory.getProvider().analyzeAnswerDetailed(
             currentQ.getContent(), currentQ.getCategory(), answerText, sessionId, questionId);
 
-        Feedback feedback = claudeAIService.generateDetailedFeedback(
+        Feedback feedback = aiProviderFactory.getProvider().generateDetailedFeedback(
             currentQ.getContent(), answerText, currentQ.getCategory(), analysis, sessionId, questionId);
 
         feedbackRepository.save(feedback);
@@ -258,7 +258,7 @@ public class SessionService {
         }
 
         List<String> askedContents = questions.stream().map(Question::getContent).toList();
-        Question nextQuestion = claudeAIService.generateAdaptiveQuestion(
+        Question nextQuestion = aiProviderFactory.getProvider().generateAdaptiveQuestion(
             session.getType().name(), session.getPosition(), adaptiveDifficulty, askedContents);
         nextQuestion.setSessionId(sessionId);
         nextQuestion.setOrder(currentQ.getOrder() + 1);
@@ -334,7 +334,7 @@ public class SessionService {
             qaPairs.add(pair);
         }
 
-        SessionSummaryDto summary = claudeAIService.generateSessionSummary(qaPairs);
+        SessionSummaryDto summary = aiProviderFactory.getProvider().generateSessionSummary(qaPairs);
 
         if (!feedbacks.isEmpty()) {
             float overallScore = avg(feedbacks.stream().mapToDouble(f -> f.getOverallScore()).toArray());

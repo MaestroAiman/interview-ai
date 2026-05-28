@@ -2,7 +2,7 @@ package com.pfa.interviewai.rest;
 
 import com.pfa.interviewai.config.AppConfig;
 import com.pfa.interviewai.rest.dto.HealthStatusDto;
-import com.pfa.interviewai.service.ClaudeAIService;
+import com.pfa.interviewai.service.AIProviderFactory;
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
@@ -16,29 +16,42 @@ import jakarta.ws.rs.core.Response;
 @RequestScoped
 public class HealthRestController {
 
-    @Inject private ClaudeAIService claudeAIService;
+    @Inject private AIProviderFactory aiProviderFactory;
     @Inject private AppConfig appConfig;
 
     @GET
     @Path("/ai")
     public Response checkAi() {
+        String providerName = appConfig.getActiveAiProvider().toLowerCase().trim();
+        String model = "claude".equals(providerName)
+            ? appConfig.getClaudeModel()
+            : appConfig.getOllamaModel();
+        String url = "ollama".equals(providerName) ? appConfig.getOllamaApiUrl() : null;
+
         long start = System.currentTimeMillis();
         try {
-            boolean reachable = claudeAIService.pingApi();
+            boolean reachable = aiProviderFactory.getProvider().pingApi();
             long latency = System.currentTimeMillis() - start;
             if (reachable) {
                 return Response.ok(new HealthStatusDto(
-                    "ok", "Claude API is reachable", latency, appConfig.getClaudeModel())).build();
+                    providerName, "ok", providerName + " API is reachable",
+                    latency, model, url)).build();
             } else {
+                String message = "ollama".equals(providerName)
+                    ? "Make sure Ollama is running: ollama serve"
+                    : "AI API ping returned unexpected response";
                 return Response.status(503).entity(new HealthStatusDto(
-                    "error", "Claude API ping returned unexpected response",
-                    latency, appConfig.getClaudeModel())).build();
+                    providerName, "unreachable", message,
+                    latency, model, url)).build();
             }
         } catch (Exception e) {
             long latency = System.currentTimeMillis() - start;
+            String message = "ollama".equals(providerName)
+                ? "Make sure Ollama is running: ollama serve"
+                : "AI API unreachable: " + e.getMessage();
             return Response.status(503).entity(new HealthStatusDto(
-                "error", "Claude API unreachable: " + e.getMessage(),
-                latency, appConfig.getClaudeModel())).build();
+                providerName, "unreachable", message,
+                latency, model, url)).build();
         }
     }
 }
