@@ -23,13 +23,12 @@ public class AppConfig {
     }
 
     public String getJwtSecret() {
-        // Default is a valid Base64-encoded 256-bit key; override via JWT_SECRET env var
         return System.getenv().getOrDefault("JWT_SECRET",
             "REDACTED_JWT_SECRET");
     }
 
     public long getJwtExpirationMs() {
-        return 86400000L; // 24 hours
+        return 86_400_000L; // 24 hours in ms
     }
 
     public String getClaudeApiUrl() {

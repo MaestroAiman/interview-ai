@@ -21,7 +21,7 @@ import java.util.Map;
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @RequestScoped
-public class SessionRestController {
+public class SessionRestController extends BaseRestController {
 
     @Inject private SessionService sessionService;
     @Inject private JwtUtil jwtUtil;
@@ -46,9 +46,4 @@ public class SessionRestController {
         }
     }
 
-    private String resolveToken(String cookie, String header) {
-        if (cookie != null && !cookie.isBlank()) return cookie;
-        if (header != null && header.startsWith("Bearer ")) return header.substring(7);
-        return null;
-    }
 }

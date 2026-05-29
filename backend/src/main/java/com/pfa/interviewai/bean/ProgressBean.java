@@ -31,7 +31,6 @@ public class ProgressBean implements Serializable {
                         .toList();
             }
         } catch (Exception e) {
-            // keep empty list
         }
     }
 

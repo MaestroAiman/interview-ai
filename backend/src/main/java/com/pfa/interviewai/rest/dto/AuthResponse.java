@@ -15,12 +15,12 @@ public class AuthResponse {
         this.role = role;
     }
 
-    public String getToken()       { return token; }
-    public void setToken(String v) { this.token = v; }
-    public String getUserId()      { return userId; }
-    public void setUserId(String v){ this.userId = v; }
-    public String getName()        { return name; }
-    public void setName(String v)  { this.name = v; }
-    public String getRole()        { return role; }
-    public void setRole(String v)  { this.role = v; }
+    public String getToken()            { return token; }
+    public void setToken(String token)  { this.token = token; }
+    public String getUserId()           { return userId; }
+    public void setUserId(String userId){ this.userId = userId; }
+    public String getName()             { return name; }
+    public void setName(String name)    { this.name = name; }
+    public String getRole()             { return role; }
+    public void setRole(String role)    { this.role = role; }
 }

@@ -40,10 +40,6 @@ public class ClaudeAIService implements AIProvider {
     private final ObjectMapper mapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
-    // -------------------------------------------------------------------------
-    // Existing method — kept for JSF/legacy compatibility
-    // -------------------------------------------------------------------------
-
     public List<String> generateQuestions(String type, String position,
                                            String difficulty, int count) {
         String prompt = String.format("""
@@ -135,10 +131,6 @@ public class ClaudeAIService implements AIProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // New method 1 — adaptive single-question generation
-    // -------------------------------------------------------------------------
-
     public Question generateAdaptiveQuestion(String interviewType, String position,
                                               String adaptiveDifficulty,
                                               List<String> askedQuestions) {
@@ -196,10 +188,6 @@ public class ClaudeAIService implements AIProvider {
                     .build();
         }
     }
-
-    // -------------------------------------------------------------------------
-    // New method 2 — detailed multi-dimension answer analysis
-    // -------------------------------------------------------------------------
 
     public Feedback analyzeAnswerDetailed(String question, String category,
                                            String answerText,
@@ -278,10 +266,6 @@ public class ClaudeAIService implements AIProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // New method 3 — actionable feedback generation
-    // -------------------------------------------------------------------------
-
     public Feedback generateDetailedFeedback(String question, String answerText,
                                               String category, Feedback analysis,
                                               String sessionId, String questionId) {
@@ -323,7 +307,6 @@ public class ClaudeAIService implements AIProvider {
                     .sessionId(sessionId)
                     .questionId(questionId)
                     .answerText(answerText)
-                    // legacy fields mapped for JSF backward compat
                     .relevanceScore(analysis.getRelevanceScore())
                     .clarityScore(analysis.getClarityScore())
                     .sentimentScore(0f)
@@ -332,7 +315,6 @@ public class ClaudeAIService implements AIProvider {
                     .improvements(improvementPoints)
                     .suggestedAnswer(exampleAnswer)
                     .shortComment(concreteAdvice)
-                    // new dimension scores from analysis
                     .depthScore(analysis.getDepthScore())
                     .vocabularyScore(analysis.getVocabularyScore())
                     .examplesScore(analysis.getExamplesScore())
@@ -340,7 +322,6 @@ public class ClaudeAIService implements AIProvider {
                     .levelAssessment(analysis.getLevelAssessment())
                     .keyStrengths(analysis.getKeyStrengths())
                     .criticalGaps(analysis.getCriticalGaps())
-                    // new feedback fields
                     .positivePoints(positivePoints)
                     .improvementPoints(improvementPoints)
                     .concreteAdvice(concreteAdvice)
@@ -375,10 +356,6 @@ public class ClaudeAIService implements AIProvider {
                     .build();
         }
     }
-
-    // -------------------------------------------------------------------------
-    // New method 4 — end-of-session summary
-    // -------------------------------------------------------------------------
 
     public SessionSummaryDto generateSessionSummary(List<Map<String, Object>> qaPairs) {
         StringBuilder context = new StringBuilder();
@@ -442,10 +419,6 @@ public class ClaudeAIService implements AIProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // New method 5 — API health check
-    // -------------------------------------------------------------------------
-
     public boolean pingApi() {
         try {
             String response = callClaude(JSON_SYSTEM_PROMPT, "Respond with: {\"status\":\"ok\"}");
@@ -457,16 +430,10 @@ public class ClaudeAIService implements AIProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // New method 6 — CV analysis for interview setup recommendations
-    // -------------------------------------------------------------------------
-
     public CvAnalysisResponse analyzeCv(String cvText) {
         String truncated = cvText.length() > 12_000
             ? cvText.substring(0, 12_000) + "\n[... truncated ...]"
             : cvText;
-
-        String systemPrompt = JSON_SYSTEM_PROMPT;
 
         String userPrompt = String.format("""
             You are an expert recruiter and career advisor.
@@ -492,7 +459,7 @@ public class ClaudeAIService implements AIProvider {
             - reasoning: briefly justify all three choices
             """, truncated);
 
-        String response = callClaude(systemPrompt, userPrompt);
+        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt);
         try {
             JsonNode node = mapper.readTree(stripCodeFences(response));
             CvAnalysisResponse result = new CvAnalysisResponse();
@@ -507,15 +474,6 @@ public class ClaudeAIService implements AIProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Private HTTP helpers
-    // -------------------------------------------------------------------------
-
-    /**
-     * Strips markdown code fences that Claude occasionally adds around JSON
-     * despite being instructed not to (e.g. ```json ... ``` or ``` ... ```).
-     * Idempotent: clean JSON passes through unchanged.
-     */
     private String stripCodeFences(String raw) {
         if (raw == null) return "";
         String s = raw.strip();

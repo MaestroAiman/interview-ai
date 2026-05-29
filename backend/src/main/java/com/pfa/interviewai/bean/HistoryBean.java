@@ -25,7 +25,6 @@ public class HistoryBean implements Serializable {
                 sessions = sessionService.findByUserId(authBean.getCurrentUser().getId());
             }
         } catch (Exception e) {
-            // keep empty list
         }
     }
 

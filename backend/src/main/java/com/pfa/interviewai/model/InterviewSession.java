@@ -30,7 +30,6 @@ public class InterviewSession {
     private String startedAt;
     private String endedAt;
 
-    // --- session summary fields (populated at session completion) ---
     private String globalAssessment;
     @Builder.Default
     private List<String> topStrengths = new ArrayList<>();

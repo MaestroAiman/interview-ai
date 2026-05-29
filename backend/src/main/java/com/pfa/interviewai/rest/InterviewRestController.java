@@ -28,7 +28,7 @@ import java.util.Map;
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @RequestScoped
-public class InterviewRestController {
+public class InterviewRestController extends BaseRestController {
 
     @Inject private SessionService sessionService;
     @Inject private JwtUtil jwtUtil;
@@ -165,14 +165,9 @@ public class InterviewRestController {
         }
     }
 
-    private String resolveToken(String cookie, String header) {
-        if (cookie != null && !cookie.isBlank()) return cookie;
-        if (header != null && header.startsWith("Bearer ")) return header.substring(7);
-        return null;
-    }
-
     private boolean isAiError(RuntimeException e) {
         String msg = e.getMessage();
-        return msg != null && (msg.contains("Claude API") || msg.contains("Anthropic API"));
+        return msg != null && (msg.contains("Claude API") || msg.contains("Anthropic API")
+            || msg.contains("Ollama server is unreachable") || msg.contains("Ollama request timed out"));
     }
 }

@@ -13,7 +13,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Feedback {
-    // --- existing fields (kept for JSF backward compatibility) ---
     private String id;
     private String sessionId;
     private String questionId;
@@ -26,21 +25,15 @@ public class Feedback {
     private String improvements;
     private String suggestedAnswer;
     private String shortComment;
-
-    // --- new dimension scores (0–100 scale) ---
     private float depthScore;
     private float vocabularyScore;
     private float examplesScore;
     private float globalScore;
-
-    // --- new analysis fields ---
     private String levelAssessment;
     @Builder.Default
     private List<String> keyStrengths = new ArrayList<>();
     @Builder.Default
     private List<String> criticalGaps = new ArrayList<>();
-
-    // --- new feedback fields ---
     private String positivePoints;
     private String improvementPoints;
     private String concreteAdvice;

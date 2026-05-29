@@ -49,10 +49,6 @@ public class OllamaAIService implements AIProvider {
             .build();
     }
 
-    // -------------------------------------------------------------------------
-    // AIProvider interface — legacy methods
-    // -------------------------------------------------------------------------
-
     @Override
     public List<String> generateQuestions(String type, String position,
                                            String difficulty, int count) {
@@ -159,10 +155,6 @@ public class OllamaAIService implements AIProvider {
                     .build();
         }
     }
-
-    // -------------------------------------------------------------------------
-    // AIProvider interface — adaptive methods
-    // -------------------------------------------------------------------------
 
     @Override
     public Question generateAdaptiveQuestion(String interviewType, String position,
@@ -515,10 +507,6 @@ public class OllamaAIService implements AIProvider {
             return fallback;
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Private HTTP helpers
-    // -------------------------------------------------------------------------
 
     private String callOllama(String systemPrompt, String userPrompt) {
         long start = System.currentTimeMillis();

@@ -46,7 +46,6 @@ public class DashboardBean implements Serializable {
                     .ifPresent(e -> stats.bestType = e.getKey().getLabel());
             }
         } catch (Exception e) {
-            // keep defaults on error
         }
     }
 

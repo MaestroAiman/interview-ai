@@ -52,7 +52,6 @@ public class AdminBean implements Serializable {
                     .average().orElse(0.0);
             applySorting();
         } catch (Exception e) {
-            // keep empty lists on error
         }
     }
 

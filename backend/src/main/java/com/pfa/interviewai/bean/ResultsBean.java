@@ -32,7 +32,6 @@ public class ResultsBean implements Serializable {
             session = sessionService.findById(sessionId);
             feedbacks = feedbackService.getFeedbackForSession(sessionId);
         } catch (Exception e) {
-            // handle gracefully
         }
     }
 

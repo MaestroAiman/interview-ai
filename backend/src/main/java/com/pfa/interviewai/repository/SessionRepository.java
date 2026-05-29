@@ -139,7 +139,6 @@ public class SessionRepository {
 
     public void deleteSession(String sessionId)
             throws ExecutionException, InterruptedException {
-        // Delete all documents in the questions subcollection first
         QuerySnapshot questions = firebase.getFirestore()
                 .collection(COLLECTION)
                 .document(sessionId)
@@ -150,7 +149,6 @@ public class SessionRepository {
             questions.getDocuments().forEach(doc -> batch.delete(doc.getReference()));
             batch.commit().get();
         }
-        // Delete the session document itself
         firebase.getFirestore()
                 .collection(COLLECTION)
                 .document(sessionId)

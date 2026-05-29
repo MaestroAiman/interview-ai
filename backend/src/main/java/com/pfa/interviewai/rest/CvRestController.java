@@ -26,7 +26,7 @@ import java.util.logging.Logger;
 @Path("/cv")
 @Produces(MediaType.APPLICATION_JSON)
 @RequestScoped
-public class CvRestController {
+public class CvRestController extends BaseRestController {
 
     private static final Logger log = Logger.getLogger(CvRestController.class.getName());
     private static final int MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -106,9 +106,4 @@ public class CvRestController {
         }
     }
 
-    private String resolveToken(String cookie, String header) {
-        if (cookie != null && !cookie.isBlank()) return cookie;
-        if (header != null && header.startsWith("Bearer ")) return header.substring(7);
-        return null;
-    }
 }

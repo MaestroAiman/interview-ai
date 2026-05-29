@@ -121,15 +121,18 @@ public class SessionService {
         List<Feedback> feedbacks = feedbackRepository.findBySessionId(sessionId);
 
         if (!feedbacks.isEmpty()) {
-            float relevanceAvg  = avg(feedbacks.stream().mapToDouble(f -> f.getRelevanceScore()).toArray());
-            float clarityAvg    = avg(feedbacks.stream().mapToDouble(f -> f.getClarityScore()).toArray());
-            float sentimentAvg  = avg(feedbacks.stream().mapToDouble(f -> f.getSentimentScore()).toArray());
-            float overallScore  = avg(feedbacks.stream().mapToDouble(f -> f.getOverallScore()).toArray());
-
-            session.setRelevanceAvg(relevanceAvg);
-            session.setClarityAvg(clarityAvg);
-            session.setSentimentAvg(sentimentAvg);
-            session.setOverallScore(overallScore);
+            double relevanceSum = 0, claritySum = 0, sentimentSum = 0, overallSum = 0;
+            for (Feedback f : feedbacks) {
+                relevanceSum  += f.getRelevanceScore();
+                claritySum    += f.getClarityScore();
+                sentimentSum  += f.getSentimentScore();
+                overallSum    += f.getOverallScore();
+            }
+            int n = feedbacks.size();
+            session.setRelevanceAvg((float) (relevanceSum / n));
+            session.setClarityAvg((float) (claritySum / n));
+            session.setSentimentAvg((float) (sentimentSum / n));
+            session.setOverallScore((float) (overallSum / n));
         }
 
         session.setStatus(SessionStatus.COMPLETED);
@@ -146,9 +149,6 @@ public class SessionService {
     public Question getFirstUnansweredQuestion(String sessionId)
             throws ExecutionException, InterruptedException {
         List<Question> questions = sessionRepository.findAllQuestions(sessionId);
-        // Use feedbacks as the progress marker: the legacy submitAnswer() endpoint
-        // only writes to feedbackRepository (not answerRepository), so feedbacks
-        // are the reliable indicator of which questions have been answered.
         List<Feedback> feedbacks = feedbackRepository.findBySessionId(sessionId);
         java.util.Set<String> answeredIds = feedbacks.stream()
                 .map(Feedback::getQuestionId)
@@ -174,17 +174,6 @@ public class SessionService {
         answerRepository.deleteBySessionId(sessionId);
         sessionRepository.deleteSession(sessionId);  // also removes questions subcollection
     }
-
-    private float avg(double[] values) {
-        if (values.length == 0) return 0f;
-        double sum = 0;
-        for (double v : values) sum += v;
-        return (float) (sum / values.length);
-    }
-
-    // =========================================================================
-    // New adaptive interview methods
-    // =========================================================================
 
     public StartSessionResponse startAdaptiveSession(InterviewType type, String position,
                                                       Difficulty difficulty, int questionCount,
@@ -337,10 +326,16 @@ public class SessionService {
         SessionSummaryDto summary = aiProviderFactory.getProvider().generateSessionSummary(qaPairs);
 
         if (!feedbacks.isEmpty()) {
-            float overallScore = avg(feedbacks.stream().mapToDouble(f -> f.getOverallScore()).toArray());
-            session.setOverallScore(overallScore);
-            session.setRelevanceAvg(avg(feedbacks.stream().mapToDouble(f -> f.getRelevanceScore()).toArray()));
-            session.setClarityAvg(avg(feedbacks.stream().mapToDouble(f -> f.getClarityScore()).toArray()));
+            double overallSum = 0, relevanceSum = 0, claritySum = 0;
+            for (Feedback f : feedbacks) {
+                overallSum   += f.getOverallScore();
+                relevanceSum += f.getRelevanceScore();
+                claritySum   += f.getClarityScore();
+            }
+            int n = feedbacks.size();
+            session.setOverallScore((float) (overallSum / n));
+            session.setRelevanceAvg((float) (relevanceSum / n));
+            session.setClarityAvg((float) (claritySum / n));
         }
 
         session.setStatus(SessionStatus.COMPLETED);
