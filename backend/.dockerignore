@@ -1,0 +1,40 @@
+# Build outputs
+target/
+build/
+*.war
+*.jar
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+.factorypath
+
+# Claude Code
+.claude/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker (pas besoin de copier les fichiers Docker dans le contexte de build)
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# Secrets (montés via volume, pas embarqués dans l'image)
+firebase-service-account.json
+
+# Documentation
+README.md
+README-DOCKER.md

@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 @ApplicationScoped
@@ -208,10 +209,31 @@ public class SessionService {
         InterviewSession session = findById(sessionId);
         if (!session.getUserId().equals(userId))
             throw new IllegalArgumentException("Access denied to session: " + sessionId);
+
+        // Idempotency check: if this question was already answered, return existing result
+        List<Question> questions = sessionRepository.findAllQuestions(sessionId);
+        List<Feedback> existingFeedbacks = feedbackRepository.findBySessionId(sessionId);
+        Feedback existingFeedback = existingFeedbacks.stream()
+                .filter(f -> questionId.equals(f.getQuestionId()))
+                .findFirst().orElse(null);
+
+        if (existingFeedback != null) {
+            Question currentQExisting = questions.stream()
+                    .filter(q -> q.getId().equals(questionId)).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Question not found: " + questionId));
+            boolean isLastExisting = currentQExisting.getOrder() >= session.getQuestionCount();
+            if (isLastExisting || session.getStatus() == SessionStatus.COMPLETED) {
+                return new AnswerFeedbackResponse(existingFeedback, null,
+                        buildExistingSummary(session, existingFeedbacks));
+            }
+            Question nextQExisting = questions.stream()
+                    .filter(q -> q.getOrder() == currentQExisting.getOrder() + 1)
+                    .findFirst().orElse(null);
+            return new AnswerFeedbackResponse(existingFeedback, nextQExisting, null);
+        }
+
         if (session.getStatus() != SessionStatus.IN_PROGRESS)
             throw new IllegalArgumentException("Session is not in progress: " + sessionId);
-
-        List<Question> questions = sessionRepository.findAllQuestions(sessionId);
         Question currentQ = questions.stream()
                 .filter(q -> q.getId().equals(questionId))
                 .findFirst()
@@ -225,30 +247,42 @@ public class SessionService {
                 .submittedAt(Instant.now().toString())
                 .build());
 
+        // Step 1: Analyze answer (sequential — needed before generating feedback)
         Feedback analysis = aiProviderFactory.getProvider().analyzeAnswerDetailed(
             currentQ.getContent(), currentQ.getCategory(), answerText, sessionId, questionId);
 
-        Feedback feedback = aiProviderFactory.getProvider().generateDetailedFeedback(
-            currentQ.getContent(), answerText, currentQ.getCategory(), analysis, sessionId, questionId);
-
-        feedbackRepository.save(feedback);
-
-        List<Feedback> allFeedbacks = feedbackRepository.findBySessionId(sessionId);
-        double avgGlobal = allFeedbacks.stream()
+        // Step 2: Compute adaptive difficulty from previous feedbacks (fast DB call)
+        List<Feedback> previousFeedbacks = feedbackRepository.findBySessionId(sessionId);
+        double avgGlobal = previousFeedbacks.stream()
                 .mapToDouble(Feedback::getGlobalScore)
                 .average()
                 .orElse(50.0);
         String adaptiveDifficulty = avgGlobal >= 75 ? "advanced" : avgGlobal >= 45 ? "intermediate" : "beginner";
 
         boolean isLastQuestion = currentQ.getOrder() >= session.getQuestionCount();
+        List<String> askedContents = questions.stream().map(Question::getContent).toList();
+
+        // Step 3: Run feedback generation and next-question generation in parallel
+        CompletableFuture<Feedback> feedbackFuture = CompletableFuture.supplyAsync(() ->
+            aiProviderFactory.getProvider().generateDetailedFeedback(
+                currentQ.getContent(), answerText, currentQ.getCategory(), analysis, sessionId, questionId));
+
+        CompletableFuture<Question> nextQuestionFuture = isLastQuestion
+            ? CompletableFuture.completedFuture(null)
+            : CompletableFuture.supplyAsync(() ->
+                aiProviderFactory.getProvider().generateAdaptiveQuestion(
+                    session.getType().name(), session.getPosition(), adaptiveDifficulty, askedContents));
+
+        Feedback feedback = feedbackFuture.get();
+        feedbackRepository.save(feedback);
+
         if (isLastQuestion) {
+            List<Feedback> allFeedbacks = feedbackRepository.findBySessionId(sessionId);
             SessionSummaryDto summary = endSessionWithSummary(sessionId, allFeedbacks, questions);
             return new AnswerFeedbackResponse(feedback, null, summary);
         }
 
-        List<String> askedContents = questions.stream().map(Question::getContent).toList();
-        Question nextQuestion = aiProviderFactory.getProvider().generateAdaptiveQuestion(
-            session.getType().name(), session.getPosition(), adaptiveDifficulty, askedContents);
+        Question nextQuestion = nextQuestionFuture.get();
         nextQuestion.setSessionId(sessionId);
         nextQuestion.setOrder(currentQ.getOrder() + 1);
         sessionRepository.saveQuestion(sessionId, nextQuestion);
@@ -298,6 +332,17 @@ public class SessionService {
         List<Answer> answers = answerRepository.findBySessionId(sessionId);
         List<Feedback> feedbacks = feedbackRepository.findBySessionId(sessionId);
         return new HistoryDetailsDto(session, questions, answers, feedbacks);
+    }
+
+    private SessionSummaryDto buildExistingSummary(InterviewSession session, List<Feedback> feedbacks) {
+        SessionSummaryDto summary = new SessionSummaryDto();
+        summary.setOverallScore(session.getOverallScore() * 10);
+        summary.setGlobalAssessment(session.getGlobalAssessment());
+        summary.setTopStrengths(session.getTopStrengths());
+        summary.setPriorityImprovements(session.getPriorityImprovements());
+        summary.setRecommendedResources(session.getRecommendedResources());
+        summary.setReadinessLevel(session.getReadinessLevel());
+        return summary;
     }
 
     private SessionSummaryDto endSessionWithSummary(String sessionId,

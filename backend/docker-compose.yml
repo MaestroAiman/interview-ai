@@ -1,0 +1,91 @@
+# =========================================================
+#  Interview-AI — Stack Docker Compose
+#  3 services :
+#    - ollama       : serveur LLM local (port 11434)
+#    - ollama-pull  : one-shot pour télécharger le modèle mistral:7b
+#    - app          : application JEE (Tomcat 10) port 8080
+# =========================================================
+
+services:
+
+  # ---------- Serveur LLM local ----------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: interview-ai-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - ai-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  # ---------- Téléchargement automatique du modèle ----------
+  # Service éphémère : se connecte au container "ollama" via OLLAMA_HOST,
+  # télécharge mistral:7b (~4 GB au 1er run), puis s'arrête.
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: interview-ai-ollama-pull
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - ai-net
+    environment:
+      OLLAMA_HOST: "http://ollama:11434"
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo ">>> Téléchargement du modèle mistral:7b (~4 GB, patience…)" && \
+        ollama pull mistral:7b && \
+        echo ">>> Modèle prêt. Le service ollama-pull va s'arrêter (c'est normal)."
+    restart: "no"
+
+  # ---------- Application Jakarta EE ----------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: interview-ai-app
+    ports:
+      - "8080:8080"
+    environment:
+      # Provider AI : ollama (local) ou claude (nécessite ANTHROPIC_API_KEY)
+      AI_PROVIDER: "ollama"
+      # URL interne via le réseau Docker (DNS = nom du service)
+      OLLAMA_API_URL: "http://ollama:11434"
+      OLLAMA_MODEL: "mistral:7b"
+      OLLAMA_CONNECT_TIMEOUT_MS: "10000"
+      OLLAMA_READ_TIMEOUT_MS: "300000"
+      # Secret JWT — valeur par défaut codée dans AppConfig si non défini
+      # JWT_SECRET: "votre-secret-base64-optionnel"
+    volumes:
+      # Bind-mount des credentials Firebase directement dans le classpath de l'app.
+      # Le WAR a été pré-exploré dans le Dockerfile → ce chemin existe.
+      # Le fichier source est dans src/main/resources/ (emplacement classique du projet).
+      - ./src/main/resources/firebase-service-account.json:/usr/local/tomcat/webapps/interview-ai/WEB-INF/classes/firebase-service-account.json:ro
+    depends_on:
+      ollama-pull:
+        condition: service_completed_successfully
+    networks:
+      - ai-net
+    restart: unless-stopped
+
+# ---------- Volumes nommés ----------
+volumes:
+  # Persiste les modèles Ollama entre redémarrages (évite re-télécharger 4 GB)
+  ollama_models:
+    name: interview-ai-ollama-models
+
+# ---------- Réseau ----------
+networks:
+  ai-net:
+    name: interview-ai-network
+    driver: bridge
