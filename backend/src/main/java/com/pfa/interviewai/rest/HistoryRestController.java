@@ -64,7 +64,10 @@ public class HistoryRestController extends BaseRestController {
 
         try {
             String userId = jwtUtil.extractUserId(token);
-            HistoryDetailsDto result = sessionService.getHistoryDetails(sessionId, userId);
+            boolean isAdmin = "ADMIN".equals(jwtUtil.extractRole(token));
+            HistoryDetailsDto result = isAdmin
+                    ? sessionService.getHistoryDetailsAdmin(sessionId)
+                    : sessionService.getHistoryDetails(sessionId, userId);
             return Response.ok(result).build();
         } catch (IllegalArgumentException e) {
             int status = e.getMessage().contains("not found") ? 404

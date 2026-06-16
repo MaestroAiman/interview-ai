@@ -260,7 +260,9 @@ public class SessionService {
         String adaptiveDifficulty = avgGlobal >= 75 ? "advanced" : avgGlobal >= 45 ? "intermediate" : "beginner";
 
         boolean isLastQuestion = currentQ.getOrder() >= session.getQuestionCount();
-        List<String> askedContents = questions.stream().map(Question::getContent).toList();
+        List<String> askedContents = questions.stream()
+                .map(q -> q.getContent() + " [category: " + (q.getCategory() != null ? q.getCategory() : "General") + "]")
+                .toList();
 
         // Step 3: Run feedback generation and next-question generation in parallel
         CompletableFuture<Feedback> feedbackFuture = CompletableFuture.supplyAsync(() ->
@@ -328,6 +330,15 @@ public class SessionService {
         InterviewSession session = findById(sessionId);
         if (!session.getUserId().equals(userId))
             throw new IllegalArgumentException("Access denied to session: " + sessionId);
+        List<Question> questions = sessionRepository.findAllQuestions(sessionId);
+        List<Answer> answers = answerRepository.findBySessionId(sessionId);
+        List<Feedback> feedbacks = feedbackRepository.findBySessionId(sessionId);
+        return new HistoryDetailsDto(session, questions, answers, feedbacks);
+    }
+
+    public HistoryDetailsDto getHistoryDetailsAdmin(String sessionId)
+            throws ExecutionException, InterruptedException {
+        InterviewSession session = findById(sessionId);
         List<Question> questions = sessionRepository.findAllQuestions(sessionId);
         List<Answer> answers = answerRepository.findBySessionId(sessionId);
         List<Feedback> feedbacks = feedbackRepository.findBySessionId(sessionId);

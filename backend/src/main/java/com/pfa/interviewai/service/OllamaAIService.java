@@ -36,6 +36,11 @@ public class OllamaAIService implements AIProvider {
         "Never add markdown formatting, code blocks, explanations, or any text outside the JSON object. " +
         "Your entire response must be directly parseable by JSON.parse() with no preprocessing.";
 
+    private static final double TEMP_QUESTION_GEN = 0.75;
+    private static final double TEMP_EVALUATION   = 0.35;
+    private static final double TEMP_FEEDBACK     = 0.50;
+    private static final double TEMP_SUMMARY      = 0.45;
+
     @Inject
     private AppConfig appConfig;
 
@@ -68,7 +73,7 @@ public class OllamaAIService implements AIProvider {
 
         String response = null;
         try {
-            response = callOllama(SYSTEM_PROMPT, userPrompt);
+            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_QUESTION_GEN);
             JsonNode node = mapper.readTree(response);
             List<String> questions = new ArrayList<>();
             JsonNode arr = node.get("questions");
@@ -103,28 +108,39 @@ public class OllamaAIService implements AIProvider {
                                    String position, String type,
                                    String sessionId, String questionId) {
         String userPrompt = String.format("""
-            Evaluate this interview answer and return a JSON assessment.
+            Evaluate this interview answer and return an accurate JSON assessment.
             Position: %s | Interview type: %s
             Question: %s
             Candidate answer: %s
 
-            Respond ONLY with a JSON object in exactly this format (replace the example values with your real assessment):
+            Scoring rubric for floats 0.0-10.0 (apply strictly):
+            - 0.0-1.5: No answer, "I don't know", completely off-topic, or blank
+            - 1.6-3.5: Only keywords repeated, no real understanding demonstrated
+            - 3.6-5.5: Partial answer with basic understanding, lacks depth or examples
+            - 5.6-7.5: Solid answer with relevant content and some structure
+            - 7.6-9.0: Strong answer with concrete examples and clear structure
+            - 9.1-10.0: Exceptional answer with metrics, nuanced insight, and originality
+
+            CRITICAL: If the candidate says "I don't know" or gives an empty/irrelevant answer, relevanceScore MUST be below 2.0 and overallScore MUST be below 2.5.
+            Do NOT use the placeholder values in the format below as your scores — assign based solely on actual answer quality.
+
+            Respond ONLY with a JSON object in exactly this format (replace ALL placeholder values with your real assessment):
             {
-              "relevanceScore": 7.5,
-              "clarityScore": 6.0,
-              "sentimentScore": 8.0,
-              "overallScore": 7.2,
-              "strengths": "The candidate demonstrated clear understanding of the topic.",
-              "improvements": "The answer lacked specific examples or technical depth.",
-              "suggestedAnswer": "A strong answer would include specific examples and demonstrate hands-on experience.",
-              "shortComment": "Good start — add concrete examples to strengthen your answer."
+              "relevanceScore": <float 0.0-10.0>,
+              "clarityScore": <float 0.0-10.0>,
+              "sentimentScore": <float 0.0-10.0>,
+              "overallScore": <float 0.0-10.0>,
+              "strengths": "<specific strength observed in this answer>",
+              "improvements": "<specific improvement needed for this answer>",
+              "suggestedAnswer": "<a model answer for this specific question>",
+              "shortComment": "<one sentence of direct, honest feedback>"
             }
             All score fields must be floats between 0.0 and 10.0. All text fields must be non-empty strings.
             """, position, type, question, answerText);
 
         String response = null;
         try {
-            response = callOllama(SYSTEM_PROMPT, userPrompt);
+            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_EVALUATION);
             JsonNode node = mapper.readTree(response);
             return Feedback.builder()
                     .id(UUID.randomUUID().toString())
@@ -170,15 +186,19 @@ public class OllamaAIService implements AIProvider {
             - Interview type: %s
             - Target position: %s
             - Difficulty level: %s
-            - Already asked (DO NOT repeat any of these): %s
+            - Already asked (DO NOT repeat or paraphrase any of these, and avoid their categories): %s
 
-            Respond ONLY with a JSON object in exactly this format (replace example values with a real new question for the position):
+            IMPORTANT: Generate a question on a COMPLETELY DIFFERENT topic from those already asked.
+            The question must be specifically relevant to the position and interview type provided.
+            Do NOT use generic filler questions.
+
+            Respond ONLY with a JSON object in exactly this format (the values below are placeholders — replace ALL of them with your actual output):
             {
-              "question": "Walk me through how you would design a checkout flow for a mobile e-commerce app.",
-              "difficulty": "intermediate",
-              "category": "UX Design",
-              "estimated_duration_seconds": 180,
-              "expected_keywords": ["user research", "wireframes", "usability"]
+              "question": "<Your generated question text goes here>",
+              "difficulty": "<beginner|intermediate|advanced>",
+              "category": "<topic category>",
+              "estimated_duration_seconds": <90|120|180|240>,
+              "expected_keywords": ["<keyword1>", "<keyword2>", "<keyword3>"]
             }
             The "difficulty" field must be exactly one of: beginner, intermediate, advanced.
             """,
@@ -187,7 +207,7 @@ public class OllamaAIService implements AIProvider {
 
         String response = null;
         try {
-            response = callOllama(SYSTEM_PROMPT, userPrompt);
+            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_QUESTION_GEN);
             JsonNode node = mapper.readTree(response);
             List<String> keywords = new ArrayList<>();
             if (node.has("expected_keywords") && node.get("expected_keywords").isArray()) {
@@ -220,24 +240,37 @@ public class OllamaAIService implements AIProvider {
                                            String answerText,
                                            String sessionId, String questionId) {
         String userPrompt = String.format("""
-            Analyze this interview answer objectively.
+            Analyze this interview answer objectively and assign accurate scores.
             Question: %s
             Category: %s
             Candidate's answer: %s
 
-            Respond ONLY with a JSON object in exactly this format (replace example values with your real assessment):
+            Scoring rubric (apply strictly based on the actual answer above):
+            - 0-15: No answer, "I don't know", completely off-topic, or blank
+            - 16-35: Only keywords repeated from the question, no real understanding demonstrated
+            - 36-55: Partial answer with basic understanding, lacks depth or concrete examples
+            - 56-75: Solid answer with relevant content and some structure
+            - 76-90: Strong answer with concrete examples, clear structure, and domain insight
+            - 91-100: Exceptional answer with metrics, nuanced understanding, and originality
+
+            CRITICAL RULES:
+            - If the candidate's answer is empty, says "I don't know", or simply repeats words from the question without adding substance, relevance MUST be below 20 and global_score MUST be below 25.
+            - Do NOT assign scores based on the placeholder values shown in the format below — assign scores based solely on the actual answer quality.
+            - key_strengths and critical_gaps must reference specific content from the candidate's answer, not generic observations.
+
+            Respond ONLY with a JSON object in exactly this format (the numeric values below are placeholders — replace ALL of them with your real assessment):
             {
               "scores": {
-                "relevance": 75,
-                "clarity": 68,
-                "depth": 60,
-                "vocabulary": 70,
-                "examples": 55
+                "relevance": <integer 0-100>,
+                "clarity": <integer 0-100>,
+                "depth": <integer 0-100>,
+                "vocabulary": <integer 0-100>,
+                "examples": <integer 0-100>
               },
-              "global_score": 67,
-              "level_assessment": "mid",
-              "key_strengths": ["Clear structure", "Practical examples"],
-              "critical_gaps": ["Limited technical depth", "No metrics cited"]
+              "global_score": <integer 0-100, weighted average: relevance 30%% + clarity 20%% + depth 25%% + vocabulary 10%% + examples 15%%>,
+              "level_assessment": "<junior|mid|senior>",
+              "key_strengths": ["<specific strength observed in this answer>"],
+              "critical_gaps": ["<specific gap observed in this answer>"]
             }
             All score fields must be integers 0-100. The "level_assessment" must be exactly one of: junior, mid, senior.
             """,
@@ -245,7 +278,7 @@ public class OllamaAIService implements AIProvider {
 
         String response = null;
         try {
-            response = callOllama(SYSTEM_PROMPT, userPrompt);
+            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_EVALUATION);
             JsonNode node = mapper.readTree(response);
             JsonNode scores = node.get("scores");
             float relevance  = (float) scores.get("relevance").asDouble();
@@ -300,18 +333,21 @@ public class OllamaAIService implements AIProvider {
                                               String category, Feedback analysis,
                                               String sessionId, String questionId) {
         String userPrompt = String.format("""
-            Generate constructive interview feedback.
+            Generate specific, constructive interview feedback based strictly on the actual answer provided.
             Question: %s
             Candidate's answer: %s
             Scores: Relevance %.0f/100, Clarity %.0f/100, Depth %.0f/100, Vocabulary %.0f/100, Examples %.0f/100
 
-            Respond ONLY with a JSON object in exactly this format (replace example values with your real feedback):
+            Base your feedback ONLY on the candidate's actual answer above — not on generic interview advice.
+            If the answer was weak or empty, be honest about it. If it was strong, acknowledge specifically what made it strong.
+
+            Respond ONLY with a JSON object in exactly this format (replace ALL placeholder values with your real feedback):
             {
-              "positive_points": "The candidate showed strong understanding of user-centered design principles and applied them throughout.",
-              "improvement_points": "The answer would be stronger with specific metrics and a concrete example from past work.",
-              "concrete_advice": "Practice the STAR method to add structured examples to every answer.",
-              "example_answer": "When redesigning the onboarding flow at Acme, I started with user interviews, mapped the journey, prototyped three variants, and A/B tested - the chosen design reduced drop-off by 23 percent.",
-              "next_difficulty": "same"
+              "positive_points": "<2-3 sentences specifically about what this candidate did well in their actual answer, or 'No significant strengths were demonstrated in this answer' if the answer was poor>",
+              "improvement_points": "<2-3 sentences on what was specifically lacking or unclear in this answer>",
+              "concrete_advice": "<1-2 actionable steps this specific candidate should practice based on their weaknesses>",
+              "example_answer": "<a model answer in 3-4 sentences for this specific question>",
+              "next_difficulty": "<easier if Depth or Relevance score below 40, harder if both above 75, same otherwise>"
             }
             The "next_difficulty" field must be exactly one of: easier, same, harder.
             """,
@@ -324,7 +360,7 @@ public class OllamaAIService implements AIProvider {
 
         String response = null;
         try {
-            response = callOllama(SYSTEM_PROMPT, userPrompt);
+            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_FEEDBACK);
             JsonNode node = mapper.readTree(response);
             String positivePoints    = node.has("positive_points")    ? node.get("positive_points").asText()    : "";
             String improvementPoints = node.has("improvement_points") ? node.get("improvement_points").asText() : "";
@@ -398,25 +434,33 @@ public class OllamaAIService implements AIProvider {
         }
 
         String userPrompt = String.format("""
-            Generate a complete interview session summary.
-            Questions and scores:
+            Generate an honest and accurate interview session summary based on the actual Q&A and scores below.
+            Questions, answers, and scores:
             %s
 
-            Respond ONLY with a JSON object in exactly this format (replace example values with your real assessment):
+            IMPORTANT scoring rules:
+            - The overall_score must reflect the actual average of the scores shown above. Do NOT invent a score.
+            - If most scores are below 40, readiness_level must be "not_ready".
+            - If most scores are above 75, readiness_level must be "ready".
+            - Otherwise, readiness_level must be "almost_ready".
+            - top_strengths and priority_improvements must reference specific patterns observed across the actual answers above.
+            - recommended_resources must be real, specific books, websites, or courses relevant to the weaknesses identified.
+
+            Respond ONLY with a JSON object in exactly this format (replace ALL placeholder values with your real assessment):
             {
-              "overall_score": 72.5,
-              "global_assessment": "The candidate demonstrated solid foundational knowledge and good communication, with room to grow in technical depth.",
-              "top_strengths": ["Clear communication", "Structured thinking", "Practical examples"],
-              "priority_improvements": ["Deepen technical knowledge", "Use specific metrics"],
-              "recommended_resources": ["Don't Make Me Think by Steve Krug", "Nielsen Norman Group articles"],
-              "readiness_level": "almost_ready"
+              "overall_score": <float 0.0-100.0, weighted average of the scores shown above>,
+              "global_assessment": "<honest 2-3 sentence assessment summarizing the candidate's actual performance across all answers>",
+              "top_strengths": ["<specific strength observed across answers>", "<another strength>"],
+              "priority_improvements": ["<specific area needing improvement based on answers>", "<another area>"],
+              "recommended_resources": ["<specific book, course, or website relevant to the gaps>", "<another resource>"],
+              "readiness_level": "<not_ready|almost_ready|ready based on the rules above>"
             }
             The "overall_score" must be a float 0.0-100.0. The "readiness_level" must be exactly one of: not_ready, almost_ready, ready.
             """, context.toString());
 
         String response = null;
         try {
-            response = callOllama(SYSTEM_PROMPT, userPrompt);
+            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_SUMMARY);
             JsonNode node = mapper.readTree(response);
 
             List<String> topStrengths = new ArrayList<>();
@@ -455,7 +499,7 @@ public class OllamaAIService implements AIProvider {
     @Override
     public boolean pingApi() {
         try {
-            String response = callOllama(SYSTEM_PROMPT, "Respond with: {\"status\":\"ok\"}");
+            String response = callOllama(SYSTEM_PROMPT, "Respond with: {\"status\":\"ok\"}", 0.1);
             JsonNode node = mapper.readTree(response);
             return node.has("status") && "ok".equals(node.get("status").asText());
         } catch (Exception e) {
@@ -489,7 +533,7 @@ public class OllamaAIService implements AIProvider {
 
         String rawResponse = null;
         try {
-            rawResponse = callOllama(SYSTEM_PROMPT, userPrompt);
+            rawResponse = callOllama(SYSTEM_PROMPT, userPrompt, 0.1);
             JsonNode node = mapper.readTree(rawResponse);
             CvAnalysisResponse result = new CvAnalysisResponse();
             result.setType(node.has("type") ? node.get("type").asText() : "HR");
@@ -508,7 +552,7 @@ public class OllamaAIService implements AIProvider {
         }
     }
 
-    private String callOllama(String systemPrompt, String userPrompt) {
+    private String callOllama(String systemPrompt, String userPrompt, double temperature) {
         long start = System.currentTimeMillis();
         log.info(String.format("Ollama API call — model=%s, promptLength=%d",
             appConfig.getOllamaModel(), userPrompt.length()));
@@ -518,7 +562,7 @@ public class OllamaAIService implements AIProvider {
         messages.add(Map.of("role", "user", "content", userPrompt));
 
         Map<String, Object> options = new LinkedHashMap<>();
-        options.put("temperature", 0.1);
+        options.put("temperature", temperature);
         options.put("num_predict", 1500);
 
         Map<String, Object> body = new LinkedHashMap<>();

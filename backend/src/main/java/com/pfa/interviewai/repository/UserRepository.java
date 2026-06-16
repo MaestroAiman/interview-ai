@@ -71,6 +71,14 @@ public class UserRepository {
                 .get();
     }
 
+    public void delete(String userId) throws ExecutionException, InterruptedException {
+        firebase.getFirestore()
+                .collection(COLLECTION)
+                .document(userId)
+                .delete()
+                .get();
+    }
+
     private Map<String, Object> toMap(User u) {
         Map<String, Object> map = new HashMap<>();
         map.put("name", u.getName());
