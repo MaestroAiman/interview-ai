@@ -34,7 +34,7 @@
                     <div class="card-dark stat-card text-center">
                         <div class="stat-icon">🎯</div>
                         <div class="stat-value font-mono">
-                            #{String.format("%.1f", resultsBean.session.relevanceAvg)}
+                            #{resultsBean.session.formattedRelevanceAvg}
                         </div>
                         <div class="stat-label">Relevance Avg</div>
                     </div>
@@ -43,7 +43,7 @@
                     <div class="card-dark stat-card text-center">
                         <div class="stat-icon">💬</div>
                         <div class="stat-value font-mono">
-                            #{String.format("%.1f", resultsBean.session.clarityAvg)}
+                            #{resultsBean.session.formattedClarityAvg}
                         </div>
                         <div class="stat-label">Clarity Avg</div>
                     </div>
@@ -52,7 +52,7 @@
                     <div class="card-dark stat-card text-center">
                         <div class="stat-icon">😊</div>
                         <div class="stat-value font-mono">
-                            #{String.format("%.1f", resultsBean.session.sentimentAvg)}
+                            #{resultsBean.session.formattedSentimentAvg}
                         </div>
                         <div class="stat-label">Sentiment Avg</div>
                     </div>
@@ -81,24 +81,24 @@
                                     <div class="accordion-header p-3 d-flex justify-content-between align-items-center"
                                          style="cursor:pointer"
                                          onclick="this.nextElementSibling.classList.toggle('d-none')">
-                                        <span>Question #{status.index + 1}</span>
-                                        <span class="score-badge">#{String.format("%.1f", fb.overallScore)}/10</span>
+                                        <span class="text-secondary">Question #{status.index + 1}</span>
+                                        <span class="score-badge">#{fb.formattedOverallScore}/10</span>
                                     </div>
-                                    <div class="accordion-body d-none p-3">
+                                    <div class="accordion-body d-none p-3" style="color:var(--text-primary)">
                                         <p class="text-secondary small">Your answer:</p>
                                         <p class="mb-3">#{fb.answerText}</p>
                                         <div class="row g-2 mb-3">
                                             <div class="col-4">
                                                 <div class="small text-secondary">Relevance</div>
-                                                <div class="font-mono">#{String.format("%.1f", fb.relevanceScore)}/10</div>
+                                                <div class="font-mono">#{fb.formattedRelevanceScore}/10</div>
                                             </div>
                                             <div class="col-4">
                                                 <div class="small text-secondary">Clarity</div>
-                                                <div class="font-mono">#{String.format("%.1f", fb.clarityScore)}/10</div>
+                                                <div class="font-mono">#{fb.formattedClarityScore}/10</div>
                                             </div>
                                             <div class="col-4">
                                                 <div class="small text-secondary">Sentiment</div>
-                                                <div class="font-mono">#{String.format("%.1f", fb.sentimentScore)}/10</div>
+                                                <div class="font-mono">#{fb.formattedSentimentScore}/10</div>
                                             </div>
                                         </div>
                                         <div class="mb-2">

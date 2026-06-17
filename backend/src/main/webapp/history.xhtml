@@ -64,7 +64,7 @@
                                         </td>
                                         <td>
                                             <h:panelGroup rendered="#{s.status.name() eq 'COMPLETED'}">
-                                                <span class="score-badge">#{String.format("%.1f", s.overallScore)}/10</span>
+                                                <span class="score-badge">#{s.formattedOverallScore}/10</span>
                                             </h:panelGroup>
                                             <h:panelGroup rendered="#{s.status.name() ne 'COMPLETED'}">
                                                 <span class="text-secondary">—</span>

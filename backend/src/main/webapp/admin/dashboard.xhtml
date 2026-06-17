@@ -33,7 +33,7 @@
                 <div class="text-secondary">In Progress</div>
             </div>
             <div class="card-dark p-4 text-center">
-                <div class="stat-number" style="font-size:2rem;font-weight:700;color:#60a5fa;">#{String.format("%.1f", adminBean.platformAvgScore)}</div>
+                <div class="stat-number" style="font-size:2rem;font-weight:700;color:#60a5fa;">#{adminBean.platformAvgScoreFormatted}</div>
                 <div class="text-secondary">Avg Score</div>
             </div>
         </div>
@@ -71,6 +71,7 @@
                                         <th>Score</th>
                                         <th>Status</th>
                                         <th>Started</th>
+                                        <th>Review</th>
                                         <th></th>
                                     </tr>
                                 </thead>
@@ -85,9 +86,22 @@
                                                 </span>
                                             </td>
                                             <td>#{s.difficulty.label}</td>
-                                            <td><span class="score-badge">#{String.format("%.1f", s.overallScore)}/10</span></td>
+                                            <td>
+                                                <span class="score-badge">#{adminBean.formatScore(s.overallScore, s.status)}/10</span>
+                                            </td>
                                             <td>#{s.status}</td>
                                             <td class="font-mono text-secondary">#{s.startedAt}</td>
+                                            <td>
+                                                <h:panelGroup rendered="#{s.status.name() eq 'COMPLETED'}">
+                                                    <h:link outcome="/results" styleClass="btn-primary-custom btn-sm">
+                                                        <f:param name="sessionId" value="#{s.id}"/>
+                                                        <i class="bi bi-eye"/> Review
+                                                    </h:link>
+                                                </h:panelGroup>
+                                                <h:panelGroup rendered="#{s.status.name() ne 'COMPLETED'}">
+                                                    <span class="text-secondary">—</span>
+                                                </h:panelGroup>
+                                            </td>
                                             <td>
                                                 <h:commandButton value="🗑 Delete"
                                                     styleClass="btn-danger-small"

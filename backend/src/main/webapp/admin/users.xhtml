@@ -18,18 +18,126 @@
             <span class="text-secondary">#{adminBean.allUsers.size()} registered users</span>
         </div>
 
-        <div class="card-dark p-4">
-            <h:panelGroup rendered="#{empty adminBean.allUsers}">
-                <div class="empty-state"><p>No users found.</p></div>
+        <h:form id="usersForm">
+
+            <!-- ── Messages ───────────────────────────────────────────────── -->
+            <h:panelGroup rendered="#{not empty adminBean.errorMessage}" layout="block">
+                <div style="background:var(--danger,#ef4444);color:#fff;padding:.5rem 1rem;border-radius:.375rem;margin-bottom:1rem;">
+                    #{adminBean.errorMessage}
+                </div>
+            </h:panelGroup>
+            <h:panelGroup rendered="#{not empty adminBean.successMessage}" layout="block">
+                <div style="background:#22c55e;color:#fff;padding:.5rem 1rem;border-radius:.375rem;margin-bottom:1rem;">
+                    #{adminBean.successMessage}
+                </div>
             </h:panelGroup>
 
-            <h:panelGroup rendered="#{not empty adminBean.allUsers}" layout="block">
-                <h:form id="usersForm">
-                    <h:panelGroup rendered="#{not empty adminBean.errorMessage}" layout="block">
-                        <div style="background:var(--danger,#ef4444);color:#fff;padding:.5rem 1rem;border-radius:.375rem;margin-bottom:1rem;">
-                            #{adminBean.errorMessage}
+            <!-- ── Add New User button ────────────────────────────────────── -->
+            <h:panelGroup rendered="#{!adminBean.showCreateForm and !adminBean.showEditForm}" layout="block"
+                          style="margin-bottom:1rem;">
+                <h:commandButton value="+ Add New User"
+                    styleClass="btn-primary-custom"
+                    action="#{adminBean.openCreateForm}"/>
+            </h:panelGroup>
+
+            <!-- ── Create form ────────────────────────────────────────────── -->
+            <h:panelGroup rendered="#{adminBean.showCreateForm}" layout="block">
+                <div class="card-dark p-4" style="margin-bottom:1.5rem;">
+                    <h5 style="margin-bottom:1rem;font-weight:600;">New User</h5>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                        <div>
+                            <label class="form-label-custom">Name *</label>
+                            <h:inputText value="#{adminBean.formName}"
+                                         styleClass="form-control-custom"
+                                         placeholder="Full name"/>
                         </div>
-                    </h:panelGroup>
+                        <div>
+                            <label class="form-label-custom">Email *</label>
+                            <h:inputText value="#{adminBean.formEmail}"
+                                         styleClass="form-control-custom"
+                                         placeholder="email@example.com"/>
+                        </div>
+                        <div>
+                            <label class="form-label-custom">Password *</label>
+                            <h:inputSecret value="#{adminBean.formPassword}"
+                                           styleClass="form-control-custom"
+                                           placeholder="Password"/>
+                        </div>
+                        <div>
+                            <label class="form-label-custom">Role</label>
+                            <h:selectOneMenu value="#{adminBean.formRole}" styleClass="form-control-custom">
+                                <f:selectItem itemValue="USER"  itemLabel="USER"/>
+                                <f:selectItem itemValue="ADMIN" itemLabel="ADMIN"/>
+                            </h:selectOneMenu>
+                        </div>
+                        <div>
+                            <label class="form-label-custom">Target Position</label>
+                            <h:inputText value="#{adminBean.formTargetPosition}"
+                                         styleClass="form-control-custom"
+                                         placeholder="e.g. Full-Stack Developer"/>
+                        </div>
+                    </div>
+                    <div style="margin-top:1rem;display:flex;gap:.5rem;">
+                        <h:commandButton value="Save"
+                            styleClass="btn-primary-custom"
+                            action="#{adminBean.saveNewUser}"/>
+                        <h:commandButton value="Cancel"
+                            styleClass="btn-sm"
+                            style="background:transparent;color:var(--text-secondary);border:1px solid var(--border);padding:.4rem 1rem;border-radius:.375rem;cursor:pointer;"
+                            action="#{adminBean.cancelCreateForm}"
+                            immediate="true"/>
+                    </div>
+                </div>
+            </h:panelGroup>
+
+            <!-- ── Edit form ──────────────────────────────────────────────── -->
+            <h:panelGroup rendered="#{adminBean.showEditForm}" layout="block">
+                <div class="card-dark p-4" style="margin-bottom:1.5rem;">
+                    <h5 style="margin-bottom:1rem;font-weight:600;">Edit User</h5>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                        <div>
+                            <label class="form-label-custom">Name *</label>
+                            <h:inputText value="#{adminBean.formName}"
+                                         styleClass="form-control-custom"/>
+                        </div>
+                        <div>
+                            <label class="form-label-custom">Email *</label>
+                            <h:inputText value="#{adminBean.formEmail}"
+                                         styleClass="form-control-custom"/>
+                        </div>
+                        <div>
+                            <label class="form-label-custom">Role</label>
+                            <h:selectOneMenu value="#{adminBean.formRole}" styleClass="form-control-custom">
+                                <f:selectItem itemValue="USER"  itemLabel="USER"/>
+                                <f:selectItem itemValue="ADMIN" itemLabel="ADMIN"/>
+                            </h:selectOneMenu>
+                        </div>
+                        <div>
+                            <label class="form-label-custom">Target Position</label>
+                            <h:inputText value="#{adminBean.formTargetPosition}"
+                                         styleClass="form-control-custom"/>
+                        </div>
+                    </div>
+                    <div style="margin-top:1rem;display:flex;gap:.5rem;">
+                        <h:commandButton value="Save Changes"
+                            styleClass="btn-primary-custom"
+                            action="#{adminBean.saveEditUser}"/>
+                        <h:commandButton value="Cancel"
+                            styleClass="btn-sm"
+                            style="background:transparent;color:var(--text-secondary);border:1px solid var(--border);padding:.4rem 1rem;border-radius:.375rem;cursor:pointer;"
+                            action="#{adminBean.cancelEditForm}"
+                            immediate="true"/>
+                    </div>
+                </div>
+            </h:panelGroup>
+
+            <!-- ── Users table ────────────────────────────────────────────── -->
+            <div class="card-dark p-4">
+                <h:panelGroup rendered="#{empty adminBean.allUsers}">
+                    <div class="empty-state"><p>No users found.</p></div>
+                </h:panelGroup>
+
+                <h:panelGroup rendered="#{not empty adminBean.allUsers}" layout="block">
                     <div class="table-responsive">
                         <table class="table-dark-custom">
                             <thead>
@@ -56,30 +164,33 @@
                                         <td>#{empty u.targetPosition ? '—' : u.targetPosition}</td>
                                         <td class="font-mono">#{adminBean.sessionCountFor(u.id)}</td>
                                         <td class="font-mono text-secondary">#{u.createdAt}</td>
-                                        <td>
+                                        <td style="display:flex;gap:.35rem;flex-wrap:wrap;">
+                                            <!-- Edit -->
                                             <h:commandButton
-                                                value="Promote"
-                                                action="#{adminBean.promoteUser(u.id)}"
-                                                rendered="#{u.role != 'ADMIN'}"
-                                                styleClass="btn-primary-custom btn-sm"
-                                                title="Promote to ADMIN"/>
-                                            <h:commandButton
-                                                value="Demote"
-                                                action="#{adminBean.demoteUser(u.id)}"
-                                                rendered="#{adminBean.canDemote(u)}"
+                                                value="✏ Edit"
+                                                action="#{adminBean.openEditUser(u)}"
+                                                rendered="#{u.id != adminBean.currentUserId}"
                                                 styleClass="btn-sm"
-                                                style="background:var(--danger,#ef4444);color:#fff;border:none;padding:.25rem .75rem;border-radius:.375rem;cursor:pointer;"
-                                                title="Demote to USER"
-                                                onclick="return confirm('Demote this admin to USER?')"/>
+                                                style="background:#3b82f6;color:#fff;border:none;padding:.25rem .75rem;border-radius:.375rem;cursor:pointer;"
+                                                title="Edit user"/>
+                                            <!-- Delete -->
+                                            <h:commandButton
+                                                value="🗑 Delete"
+                                                action="#{adminBean.deleteUser(u.id)}"
+                                                rendered="#{u.id != adminBean.currentUserId}"
+                                                styleClass="btn-danger-small"
+                                                title="Delete user"
+                                                onclick="return confirm('Permanently delete user #{u.name}? This will not delete their sessions.')"/>
                                         </td>
                                     </tr>
                                 </ui:repeat>
                             </tbody>
                         </table>
                     </div>
-                </h:form>
-            </h:panelGroup>
-        </div>
+                </h:panelGroup>
+            </div>
+
+        </h:form>
     </ui:define>
 
 </ui:composition>

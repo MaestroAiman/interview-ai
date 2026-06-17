@@ -38,4 +38,9 @@ public class InterviewSession {
     @Builder.Default
     private List<String> recommendedResources = new ArrayList<>();
     private String readinessLevel;
+
+    public String getFormattedOverallScore()   { return String.format("%.1f", overallScore); }
+    public String getFormattedRelevanceAvg()   { return String.format("%.1f", relevanceAvg); }
+    public String getFormattedClarityAvg()     { return String.format("%.1f", clarityAvg); }
+    public String getFormattedSentimentAvg()   { return String.format("%.1f", sentimentAvg); }
 }

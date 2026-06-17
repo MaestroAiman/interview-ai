@@ -32,9 +32,23 @@ public class AdminBean implements Serializable {
 
     private String currentUserId;
     private String errorMessage;
+    private String successMessage;
 
     private String sortField = "startedAt";
     private boolean sortAscending = false;
+
+    // ── User CRUD form state ──────────────────────────────────────────────────
+    private boolean showCreateForm = false;
+    private boolean showEditForm   = false;
+    private String  editUserId;
+
+    private String formName;
+    private String formEmail;
+    private String formPassword;
+    private String formRole = "USER";
+    private String formTargetPosition;
+
+    // ── Init ─────────────────────────────────────────────────────────────────
 
     public void init() {
         if (!isAdmin()) return;
@@ -55,11 +69,14 @@ public class AdminBean implements Serializable {
         }
     }
 
+    // ── Session actions ───────────────────────────────────────────────────────
+
     public void deleteSession(String sessionId) {
         if (!isAdmin()) return;
         try {
             sessionService.deleteSessionById(sessionId);
-            errorMessage = null;
+            errorMessage   = null;
+            successMessage = null;
             init();
         } catch (Exception e) {
             errorMessage = "Failed to delete session: " + e.getMessage();
@@ -91,10 +108,13 @@ public class AdminBean implements Serializable {
         allSessions.sort(cmp);
     }
 
+    // ── Role management ───────────────────────────────────────────────────────
+
     public void promoteUser(String userId) {
         try {
             userService.setRole(userId, "ADMIN");
-            errorMessage = null;
+            errorMessage   = null;
+            successMessage = null;
             init();
         } catch (Exception e) {
             errorMessage = "Failed to promote user: " + e.getMessage();
@@ -108,7 +128,8 @@ public class AdminBean implements Serializable {
         }
         try {
             userService.setRole(userId, "USER");
-            errorMessage = null;
+            errorMessage   = null;
+            successMessage = null;
             init();
         } catch (Exception e) {
             errorMessage = "Failed to demote user: " + e.getMessage();
@@ -118,6 +139,113 @@ public class AdminBean implements Serializable {
     public boolean canDemote(User u) {
         return "ADMIN".equals(u.getRole()) && !u.getId().equals(currentUserId);
     }
+
+    // ── User CRUD ─────────────────────────────────────────────────────────────
+
+    public void openCreateForm() {
+        clearForm();
+        showCreateForm = true;
+        showEditForm   = false;
+        errorMessage   = null;
+        successMessage = null;
+    }
+
+    public void cancelCreateForm() {
+        showCreateForm = false;
+        clearForm();
+    }
+
+    public void saveNewUser() {
+        if (!isAdmin()) return;
+        try {
+            userService.createUser(formName, formEmail, formPassword,
+                                   formRole, formTargetPosition);
+            successMessage = "User \"" + formName + "\" created successfully.";
+            errorMessage   = null;
+            showCreateForm = false;
+            clearForm();
+            allUsers = userService.findAll();
+        } catch (Exception e) {
+            errorMessage   = "Failed to create user: " + e.getMessage();
+            successMessage = null;
+        }
+    }
+
+    public void openEditUser(User u) {
+        editUserId         = u.getId();
+        formName           = u.getName();
+        formEmail          = u.getEmail();
+        formRole           = u.getRole() != null ? u.getRole() : "USER";
+        formTargetPosition = u.getTargetPosition();
+        formPassword       = null;
+        showEditForm       = true;
+        showCreateForm     = false;
+        errorMessage       = null;
+        successMessage     = null;
+    }
+
+    public void cancelEditForm() {
+        showEditForm = false;
+        clearForm();
+    }
+
+    public void saveEditUser() {
+        if (!isAdmin()) return;
+        try {
+            userService.updateUser(editUserId, formName, formEmail,
+                                   formTargetPosition, formRole);
+            successMessage = "User updated successfully.";
+            errorMessage   = null;
+            showEditForm   = false;
+            clearForm();
+            allUsers = userService.findAll();
+        } catch (Exception e) {
+            errorMessage   = "Failed to update user: " + e.getMessage();
+            successMessage = null;
+        }
+    }
+
+    public void deleteUser(String userId) {
+        if (!isAdmin()) return;
+        if (userId.equals(currentUserId)) {
+            errorMessage = "You cannot delete your own account.";
+            return;
+        }
+        try {
+            userService.deleteUser(userId);
+            successMessage = "User deleted successfully.";
+            errorMessage   = null;
+            allUsers = userService.findAll();
+            allSessions = sessionService.findAll();
+            applySorting();
+        } catch (Exception e) {
+            errorMessage   = "Failed to delete user: " + e.getMessage();
+            successMessage = null;
+        }
+    }
+
+    private void clearForm() {
+        formName = null;
+        formEmail = null;
+        formPassword = null;
+        formTargetPosition = null;
+        formRole = "USER";
+        editUserId = null;
+    }
+
+    // ── Score formatting helpers ──────────────────────────────────────────────
+
+    public String getPlatformAvgScoreFormatted() {
+        return platformAvgScore > 0 ? String.format("%.1f", platformAvgScore) : "—";
+    }
+
+    public String formatScore(float score, SessionStatus status) {
+        return status == SessionStatus.COMPLETED
+                ? String.format("%.1f", score)
+                : "—";
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     public long sessionCountFor(String userId) {
         return allSessions.stream()
@@ -134,14 +262,32 @@ public class AdminBean implements Serializable {
         return allSessions.stream().filter(s -> status == s.getStatus()).count();
     }
 
+    // ── Getters / Setters ─────────────────────────────────────────────────────
+
     public List<InterviewSession> getAllSessions() { return allSessions; }
-    public List<User> getAllUsers()               { return allUsers; }
-    public long getCompletedCount()              { return completedCount; }
-    public long getInProgressCount()             { return inProgressCount; }
-    public long getAbandonedCount()              { return abandonedCount; }
-    public double getPlatformAvgScore()          { return platformAvgScore; }
-    public String getCurrentUserId()             { return currentUserId; }
-    public String getErrorMessage()              { return errorMessage; }
-    public String getSortField()                 { return sortField; }
-    public boolean isSortAscending()             { return sortAscending; }
+    public List<User>  getAllUsers()               { return allUsers; }
+    public long getCompletedCount()               { return completedCount; }
+    public long getInProgressCount()              { return inProgressCount; }
+    public long getAbandonedCount()               { return abandonedCount; }
+    public double getPlatformAvgScore()           { return platformAvgScore; }
+    public String getCurrentUserId()              { return currentUserId; }
+    public String getErrorMessage()               { return errorMessage; }
+    public String getSuccessMessage()             { return successMessage; }
+    public String getSortField()                  { return sortField; }
+    public boolean isSortAscending()              { return sortAscending; }
+
+    public boolean isShowCreateForm()             { return showCreateForm; }
+    public boolean isShowEditForm()               { return showEditForm; }
+    public String  getEditUserId()                { return editUserId; }
+
+    public String getFormName()                   { return formName; }
+    public void   setFormName(String v)           { formName = v; }
+    public String getFormEmail()                  { return formEmail; }
+    public void   setFormEmail(String v)          { formEmail = v; }
+    public String getFormPassword()               { return formPassword; }
+    public void   setFormPassword(String v)       { formPassword = v; }
+    public String getFormRole()                   { return formRole; }
+    public void   setFormRole(String v)           { formRole = v; }
+    public String getFormTargetPosition()         { return formTargetPosition; }
+    public void   setFormTargetPosition(String v) { formTargetPosition = v; }
 }

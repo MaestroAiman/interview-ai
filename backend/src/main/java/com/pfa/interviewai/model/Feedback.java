@@ -39,4 +39,9 @@ public class Feedback {
     private String concreteAdvice;
     private String exampleAnswer;
     private String nextDifficulty;
+
+    public String getFormattedOverallScore()   { return String.format("%.1f", overallScore); }
+    public String getFormattedRelevanceScore() { return String.format("%.1f", relevanceScore); }
+    public String getFormattedClarityScore()   { return String.format("%.1f", clarityScore); }
+    public String getFormattedSentimentScore() { return String.format("%.1f", sentimentScore); }
 }
