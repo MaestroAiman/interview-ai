@@ -58,12 +58,13 @@ services:
       - "8080:8080"
     environment:
       # Provider AI : ollama (local) ou claude (nécessite ANTHROPIC_API_KEY)
-      AI_PROVIDER: "ollama"
+      AI_PROVIDER: "claude"
       # URL interne via le réseau Docker (DNS = nom du service)
       OLLAMA_API_URL: "http://ollama:11434"
       OLLAMA_MODEL: "mistral:7b"
       OLLAMA_CONNECT_TIMEOUT_MS: "10000"
       OLLAMA_READ_TIMEOUT_MS: "300000"
+      ANTHROPIC_API_KEY: "REDACTED_ANTHROPIC_KEY"
       # Secret JWT — valeur par défaut codée dans AppConfig si non défini
       # JWT_SECRET: "votre-secret-base64-optionnel"
     volumes:
@@ -78,11 +79,56 @@ services:
       - ai-net
     restart: unless-stopped
 
+  # ---------- Prometheus — collecte des métriques ----------
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: interview-ai-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    networks:
+      - ai-net
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  # ---------- Grafana — visualisation ----------
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: interview-ai-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: interviewai
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: "grafana-image-renderer"
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    networks:
+      - ai-net
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 # ---------- Volumes nommés ----------
 volumes:
   # Persiste les modèles Ollama entre redémarrages (évite re-télécharger 4 GB)
   ollama_models:
     name: interview-ai-ollama-models
+  prometheus_data:
+    name: interview-ai-prometheus-data
+  grafana_data:
+    name: interview-ai-grafana-data
 
 # ---------- Réseau ----------
 networks:

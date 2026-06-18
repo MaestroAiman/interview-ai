@@ -3,10 +3,12 @@ package com.pfa.interviewai.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pfa.interviewai.config.AppConfig;
+import com.pfa.interviewai.metrics.MetricsRegistry;
 import com.pfa.interviewai.model.Feedback;
 import com.pfa.interviewai.model.Question;
 import com.pfa.interviewai.rest.dto.CvAnalysisResponse;
 import com.pfa.interviewai.rest.dto.SessionSummaryDto;
+import io.prometheus.client.Histogram;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -44,6 +46,9 @@ public class OllamaAIService implements AIProvider {
     @Inject
     private AppConfig appConfig;
 
+    @Inject
+    private MetricsRegistry metricsRegistry;
+
     private final ObjectMapper mapper = new ObjectMapper();
     private HttpClient httpClient;
 
@@ -73,7 +78,7 @@ public class OllamaAIService implements AIProvider {
 
         String response = null;
         try {
-            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_QUESTION_GEN);
+            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_QUESTION_GEN, "generate_questions");
             JsonNode node = mapper.readTree(response);
             List<String> questions = new ArrayList<>();
             JsonNode arr = node.get("questions");
@@ -140,7 +145,7 @@ public class OllamaAIService implements AIProvider {
 
         String response = null;
         try {
-            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_EVALUATION);
+            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_EVALUATION, "analyze_answer");
             JsonNode node = mapper.readTree(response);
             return Feedback.builder()
                     .id(UUID.randomUUID().toString())
@@ -207,7 +212,7 @@ public class OllamaAIService implements AIProvider {
 
         String response = null;
         try {
-            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_QUESTION_GEN);
+            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_QUESTION_GEN, "adaptive_question");
             JsonNode node = mapper.readTree(response);
             List<String> keywords = new ArrayList<>();
             if (node.has("expected_keywords") && node.get("expected_keywords").isArray()) {
@@ -278,7 +283,7 @@ public class OllamaAIService implements AIProvider {
 
         String response = null;
         try {
-            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_EVALUATION);
+            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_EVALUATION, "analyze_answer_detailed");
             JsonNode node = mapper.readTree(response);
             JsonNode scores = node.get("scores");
             float relevance  = (float) scores.get("relevance").asDouble();
@@ -360,7 +365,7 @@ public class OllamaAIService implements AIProvider {
 
         String response = null;
         try {
-            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_FEEDBACK);
+            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_FEEDBACK, "detailed_feedback");
             JsonNode node = mapper.readTree(response);
             String positivePoints    = node.has("positive_points")    ? node.get("positive_points").asText()    : "";
             String improvementPoints = node.has("improvement_points") ? node.get("improvement_points").asText() : "";
@@ -460,7 +465,7 @@ public class OllamaAIService implements AIProvider {
 
         String response = null;
         try {
-            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_SUMMARY);
+            response = callOllama(SYSTEM_PROMPT, userPrompt, TEMP_SUMMARY, "session_summary");
             JsonNode node = mapper.readTree(response);
 
             List<String> topStrengths = new ArrayList<>();
@@ -499,7 +504,7 @@ public class OllamaAIService implements AIProvider {
     @Override
     public boolean pingApi() {
         try {
-            String response = callOllama(SYSTEM_PROMPT, "Respond with: {\"status\":\"ok\"}", 0.1);
+            String response = callOllama(SYSTEM_PROMPT, "Respond with: {\"status\":\"ok\"}", 0.1, "ping");
             JsonNode node = mapper.readTree(response);
             return node.has("status") && "ok".equals(node.get("status").asText());
         } catch (Exception e) {
@@ -533,7 +538,7 @@ public class OllamaAIService implements AIProvider {
 
         String rawResponse = null;
         try {
-            rawResponse = callOllama(SYSTEM_PROMPT, userPrompt, 0.1);
+            rawResponse = callOllama(SYSTEM_PROMPT, userPrompt, 0.1, "analyze_cv");
             JsonNode node = mapper.readTree(rawResponse);
             CvAnalysisResponse result = new CvAnalysisResponse();
             result.setType(node.has("type") ? node.get("type").asText() : "HR");
@@ -552,10 +557,19 @@ public class OllamaAIService implements AIProvider {
         }
     }
 
-    private String callOllama(String systemPrompt, String userPrompt, double temperature) {
+    private String callOllama(String systemPrompt, String userPrompt,
+                               double temperature, String operation) {
         long start = System.currentTimeMillis();
-        log.info(String.format("Ollama API call — model=%s, promptLength=%d",
-            appConfig.getOllamaModel(), userPrompt.length()));
+        log.info(String.format("Ollama API call — model=%s, operation=%s, promptLength=%d",
+            appConfig.getOllamaModel(), operation, userPrompt.length()));
+
+        metricsRegistry.getPromptLength()
+            .labels("ollama", operation)
+            .observe(userPrompt.length());
+
+        Histogram.Timer timer = metricsRegistry.getRequestDuration()
+            .labels("ollama", operation)
+            .startTimer();
 
         List<Map<String, String>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", systemPrompt));
@@ -586,8 +600,8 @@ public class OllamaAIService implements AIProvider {
                 request, HttpResponse.BodyHandlers.ofString());
 
             long elapsed = System.currentTimeMillis() - start;
-            log.info(String.format("Ollama API response — status=%d, elapsed=%dms",
-                response.statusCode(), elapsed));
+            log.info(String.format("Ollama API response — operation=%s, status=%d, elapsed=%dms",
+                operation, response.statusCode(), elapsed));
 
             if (response.statusCode() != 200) {
                 throw new RuntimeException("Ollama returned HTTP " + response.statusCode()
@@ -600,18 +614,24 @@ public class OllamaAIService implements AIProvider {
                 ? rawContent.substring(0, 500) + "..."
                 : rawContent;
             log.info("Ollama raw content: " + preview);
+
+            metricsRegistry.getRequestsTotal().labels("ollama", operation, "success").inc();
             return extractJson(sanitize(rawContent));
 
         } catch (java.net.ConnectException | java.net.http.HttpConnectTimeoutException e) {
+            metricsRegistry.getRequestsTotal().labels("ollama", operation, "error").inc();
             throw new RuntimeException(
                 "Ollama server is unreachable. Make sure Ollama is running: ollama serve", e);
         } catch (java.net.http.HttpTimeoutException e) {
+            metricsRegistry.getRequestsTotal().labels("ollama", operation, "error").inc();
             throw new RuntimeException(
                 "Ollama request timed out after " + appConfig.getOllamaReadTimeoutMs()
                 + "ms. Mistral 7B on CPU may be too slow for this prompt — try a shorter input or larger timeout.", e);
         } catch (RuntimeException e) {
+            metricsRegistry.getRequestsTotal().labels("ollama", operation, "error").inc();
             throw e;
         } catch (Exception e) {
+            metricsRegistry.getRequestsTotal().labels("ollama", operation, "error").inc();
             if (rawContent != null) {
                 log.severe("Ollama response parsing failed. Raw response: " + rawContent);
                 throw new RuntimeException(
@@ -619,6 +639,8 @@ public class OllamaAIService implements AIProvider {
             }
             throw new RuntimeException(
                 "Ollama server is unreachable. Make sure Ollama is running: ollama serve", e);
+        } finally {
+            timer.observeDuration();
         }
     }
 

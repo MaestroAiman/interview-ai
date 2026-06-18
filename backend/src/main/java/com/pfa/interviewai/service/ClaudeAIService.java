@@ -3,10 +3,12 @@ package com.pfa.interviewai.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pfa.interviewai.config.AppConfig;
+import com.pfa.interviewai.metrics.MetricsRegistry;
 import com.pfa.interviewai.model.Feedback;
 import com.pfa.interviewai.model.Question;
 import com.pfa.interviewai.rest.dto.CvAnalysisResponse;
 import com.pfa.interviewai.rest.dto.SessionSummaryDto;
+import io.prometheus.client.Histogram;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
@@ -37,6 +39,9 @@ public class ClaudeAIService implements AIProvider {
     @Inject
     private AppConfig appConfig;
 
+    @Inject
+    private MetricsRegistry metricsRegistry;
+
     private final ObjectMapper mapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -54,7 +59,7 @@ public class ClaudeAIService implements AIProvider {
             - DOMAIN: domain-specific technical and business knowledge
             """, count, difficulty, position, type);
 
-        String response = callClaude(prompt);
+        String response = callClaude("", prompt, "generate_questions");
         try {
             JsonNode node = mapper.readTree(response);
             List<String> questions = new ArrayList<>();
@@ -99,7 +104,7 @@ public class ClaudeAIService implements AIProvider {
             - overallScore: weighted (relevance 40%% + clarity 35%% + sentiment 25%%)
             """, position, type, question, answerText);
 
-        String response = callClaude(prompt);
+        String response = callClaude("", prompt, "analyze_answer");
         try {
             JsonNode node = mapper.readTree(response);
             return Feedback.builder()
@@ -160,7 +165,7 @@ public class ClaudeAIService implements AIProvider {
             interviewType, position, adaptiveDifficulty,
             askedList.length() > 0 ? askedList.toString() : "(none yet)");
 
-        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt);
+        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt, "adaptive_question");
         try {
             JsonNode node = mapper.readTree(response);
             List<String> keywords = new ArrayList<>();
@@ -215,7 +220,7 @@ public class ClaudeAIService implements AIProvider {
             """,
             category != null ? category : "General", question, answerText);
 
-        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt);
+        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt, "analyze_answer_detailed");
         try {
             JsonNode node = mapper.readTree(response);
             JsonNode scores = node.get("scores");
@@ -293,7 +298,7 @@ public class ClaudeAIService implements AIProvider {
             analysis.getVocabularyScore(),
             analysis.getExamplesScore());
 
-        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt);
+        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt, "detailed_feedback");
         try {
             JsonNode node = mapper.readTree(response);
             String positivePoints   = node.has("positive_points") ? node.get("positive_points").asText() : "";
@@ -382,7 +387,7 @@ public class ClaudeAIService implements AIProvider {
             }
             """, context.toString());
 
-        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt);
+        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt, "session_summary");
         try {
             JsonNode node = mapper.readTree(response);
 
@@ -421,7 +426,7 @@ public class ClaudeAIService implements AIProvider {
 
     public boolean pingApi() {
         try {
-            String response = callClaude(JSON_SYSTEM_PROMPT, "Respond with: {\"status\":\"ok\"}");
+            String response = callClaude(JSON_SYSTEM_PROMPT, "Respond with: {\"status\":\"ok\"}", "ping");
             JsonNode node = mapper.readTree(response);
             return node.has("status") && "ok".equals(node.get("status").asText());
         } catch (Exception e) {
@@ -459,7 +464,7 @@ public class ClaudeAIService implements AIProvider {
             - reasoning: briefly justify all three choices
             """, truncated);
 
-        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt);
+        String response = callClaude(JSON_SYSTEM_PROMPT, userPrompt, "analyze_cv");
         try {
             JsonNode node = mapper.readTree(stripCodeFences(response));
             CvAnalysisResponse result = new CvAnalysisResponse();
@@ -485,13 +490,18 @@ public class ClaudeAIService implements AIProvider {
         return s.strip();
     }
 
-    private String callClaude(String userPrompt) {
-        return callClaude("", userPrompt);
-    }
-
-    private String callClaude(String systemPrompt, String userPrompt) {
+    private String callClaude(String systemPrompt, String userPrompt, String operation) {
         long start = System.currentTimeMillis();
-        log.info(String.format("Claude API call — promptLength=%d", userPrompt.length()));
+        log.info(String.format("Claude API call — operation=%s, promptLength=%d",
+            operation, userPrompt.length()));
+
+        metricsRegistry.getPromptLength()
+            .labels("claude", operation)
+            .observe(userPrompt.length());
+
+        Histogram.Timer timer = metricsRegistry.getRequestDuration()
+            .labels("claude", operation)
+            .startTimer();
         try {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("model", appConfig.getClaudeModel());
@@ -514,8 +524,8 @@ public class ClaudeAIService implements AIProvider {
                 request, HttpResponse.BodyHandlers.ofString());
 
             long elapsed = System.currentTimeMillis() - start;
-            log.info(String.format("Claude API response — status=%d, elapsed=%dms",
-                response.statusCode(), elapsed));
+            log.info(String.format("Claude API response — operation=%s, status=%d, elapsed=%dms",
+                operation, response.statusCode(), elapsed));
 
             if (response.statusCode() != 200) {
                 throw new RuntimeException("Anthropic API returned " + response.statusCode()
@@ -527,11 +537,16 @@ public class ClaudeAIService implements AIProvider {
             if (content == null || !content.isArray() || content.isEmpty()) {
                 throw new RuntimeException("Unexpected API response: " + response.body());
             }
+
+            metricsRegistry.getRequestsTotal().labels("claude", operation, "success").inc();
             return content.get(0).get("text").asText();
 
         } catch (Exception e) {
+            metricsRegistry.getRequestsTotal().labels("claude", operation, "error").inc();
             log.severe("Claude API error: " + e.getMessage());
             throw new RuntimeException("Claude API call failed: " + e.getMessage(), e);
+        } finally {
+            timer.observeDuration();
         }
     }
 }
