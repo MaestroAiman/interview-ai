@@ -5,9 +5,11 @@ import com.pfa.interviewai.rest.dto.HealthStatusDto;
 import com.pfa.interviewai.service.AIProviderFactory;
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
@@ -18,11 +20,16 @@ public class HealthRestController {
 
     @Inject private AIProviderFactory aiProviderFactory;
     @Inject private AppConfig appConfig;
+    @Context private HttpServletRequest request;
 
     @GET
     @Path("/ai")
     public Response checkAi() {
-        String providerName = appConfig.getActiveAiProvider().toLowerCase().trim();
+        String headerProvider = request.getHeader("X-AI-Provider");
+        String providerName = (headerProvider != null && !headerProvider.isBlank())
+            ? headerProvider.toLowerCase().trim()
+            : appConfig.getActiveAiProvider().toLowerCase().trim();
+
         String model = "claude".equals(providerName)
             ? appConfig.getClaudeModel()
             : appConfig.getOllamaModel();
@@ -39,16 +46,22 @@ public class HealthRestController {
             } else {
                 String message = "ollama".equals(providerName)
                     ? "Make sure Ollama is running: ollama serve"
-                    : "AI API ping returned unexpected response";
+                    : "Claude API ping returned unexpected response";
                 return Response.status(503).entity(new HealthStatusDto(
                     providerName, "unreachable", message,
                     latency, model, url)).build();
             }
+        } catch (IllegalStateException e) {
+            long latency = System.currentTimeMillis() - start;
+            return Response.status(503).entity(new HealthStatusDto(
+                providerName, "unreachable",
+                "ANTHROPIC_API_KEY non configuré sur le serveur",
+                latency, model, url)).build();
         } catch (Exception e) {
             long latency = System.currentTimeMillis() - start;
             String message = "ollama".equals(providerName)
                 ? "Make sure Ollama is running: ollama serve"
-                : "AI API unreachable: " + e.getMessage();
+                : "Claude API indisponible: " + e.getMessage();
             return Response.status(503).entity(new HealthStatusDto(
                 providerName, "unreachable", message,
                 latency, model, url)).build();
