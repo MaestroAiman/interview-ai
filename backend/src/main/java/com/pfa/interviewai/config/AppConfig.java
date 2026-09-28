@@ -23,8 +23,12 @@ public class AppConfig {
     }
 
     public String getJwtSecret() {
-        return System.getenv().getOrDefault("JWT_SECRET",
-            "REDACTED_JWT_SECRET");
+        String secret = System.getenv("JWT_SECRET");
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                "JWT_SECRET n'est pas défini : ajoutez-le dans backend/.env (voir .env.example)");
+        }
+        return secret;
     }
 
     public long getJwtExpirationMs() {

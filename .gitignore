@@ -1,0 +1,11 @@
+# Secrets — ne jamais commiter
+.env
+*.env
+!.env.example
+**/firebase-service-account.json
+**/google-services.json
+
+# OS / IDE
+.DS_Store
+.idea/
+*.iml

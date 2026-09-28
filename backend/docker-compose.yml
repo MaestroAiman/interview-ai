@@ -64,9 +64,9 @@ services:
       OLLAMA_MODEL: "mistral:7b"
       OLLAMA_CONNECT_TIMEOUT_MS: "10000"
       OLLAMA_READ_TIMEOUT_MS: "300000"
-      ANTHROPIC_API_KEY: "REDACTED_ANTHROPIC_KEY"
-      # Secret JWT — valeur par défaut codée dans AppConfig si non défini
-      # JWT_SECRET: "votre-secret-base64-optionnel"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:?Definir ANTHROPIC_API_KEY dans backend/.env}"
+      # Secret JWT — obligatoire, lu depuis backend/.env
+      JWT_SECRET: "${JWT_SECRET:?Definir JWT_SECRET dans backend/.env}"
     volumes:
       # Bind-mount des credentials Firebase directement dans le classpath de l'app.
       # Le WAR a été pré-exploré dans le Dockerfile → ce chemin existe.
