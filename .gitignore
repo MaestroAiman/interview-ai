@@ -9,3 +9,6 @@
 .DS_Store
 .idea/
 *.iml
+
+# Claude Code local settings
+.claude/
